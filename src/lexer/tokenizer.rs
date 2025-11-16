@@ -1,3 +1,13 @@
+use nom::{
+    IResult, Parser,
+    branch::alt,
+    bytes::complete::tag,
+    character::complete::{alpha1, alphanumeric1, char, digit1, multispace0},
+    combinator::{recognize, value},
+    multi::many0,
+    sequence::pair,
+};
+
 use super::tokens::{Span, Token, TokenWithSpan};
 
 #[derive(Debug, Clone)]
@@ -23,70 +33,116 @@ impl Tokenizer {
     }
 
     pub fn tokenize(&mut self, input: &str) -> Result<Vec<TokenWithSpan>, TokenizeError> {
-        let mut tokens = Vec::new();
-        let chars: Vec<char> = input.chars().collect();
-        let mut position = 0;
-
-        while position < chars.len() {
-            // Skip whitespace
-            while position < chars.len() && chars[position].is_whitespace() {
-                position += 1;
+        match parse_tokens(input) {
+            Ok((remaining, tokens)) => {
+                if remaining.is_empty() {
+                    Ok(tokens)
+                } else {
+                    Err(TokenizeError::ParseError(format!(
+                        "Parse error: Unexpected remaining input: '{}'",
+                        remaining
+                    )))
+                }
             }
+            Err(e) => Err(TokenizeError::ParseError(format!("Parse error: {}", e))),
+        }
+    }
+}
 
-            if position >= chars.len() {
+// Helper function to calculate line and column from position
+fn calculate_position(input: &str, pos: usize) -> (usize, usize) {
+    let prefix = &input[..pos.min(input.len())];
+    let line = prefix.matches('\n').count() + 1;
+    let column = prefix
+        .rfind('\n')
+        .map_or(pos + 1, |last_newline| pos - last_newline);
+    (line, column)
+}
+
+fn parse_identifier_or_keyword(input: &str) -> IResult<&str, Token> {
+    recognize(pair(alpha1, many0(alt((alphanumeric1, tag("_"))))))
+        .map(|s: &str| match s {
+            "let" => Token::Let,
+            _ => Token::Identifier(s.to_string()),
+        })
+        .parse(input)
+}
+
+fn parse_number(input: &str) -> IResult<&str, Token> {
+    digit1.map_res(str::parse).map(Token::Number).parse(input)
+}
+
+fn parse_assign(input: &str) -> IResult<&str, Token> {
+    value(Token::Assign, char('=')).parse(input)
+}
+
+fn parse_semicolon(input: &str) -> IResult<&str, Token> {
+    value(Token::Semicolon, char(';')).parse(input)
+}
+
+fn parse_colon(input: &str) -> IResult<&str, Token> {
+    value(Token::Colon, char(':')).parse(input)
+}
+
+fn parse_single_token(input: &str) -> IResult<&str, Token> {
+    alt((
+        parse_identifier_or_keyword,
+        parse_number,
+        parse_assign,
+        parse_semicolon,
+        parse_colon,
+    ))
+    .parse(input)
+}
+
+fn parse_token_with_whitespace<'a>(
+    input: &'a str,
+    original_input: &str,
+    offset: usize,
+) -> IResult<&'a str, Option<TokenWithSpan>> {
+    let (input_after_ws, _) = multispace0(input)?;
+
+    if input_after_ws.is_empty() {
+        return Ok((input_after_ws, None));
+    }
+
+    let ws_consumed = input.len() - input_after_ws.len();
+    let start_offset = offset + ws_consumed;
+    let (rest, token) = parse_single_token(input_after_ws)?;
+    let token_len = input_after_ws.len() - rest.len();
+    let end_offset = start_offset + token_len;
+
+    let (line, column) = calculate_position(original_input, start_offset);
+    let span = Span::new(start_offset, end_offset, line, column);
+
+    Ok((rest, Some(TokenWithSpan::new(token, span))))
+}
+
+fn parse_tokens(input: &str) -> IResult<&str, Vec<TokenWithSpan>> {
+    let mut tokens = Vec::new();
+    let mut remaining = input;
+    let original_input = input;
+
+    loop {
+        let current_offset = original_input.len() - remaining.len();
+        match parse_token_with_whitespace(remaining, original_input, current_offset) {
+            Ok((rest, Some(token))) => {
+                tokens.push(token);
+                remaining = rest;
+            }
+            Ok((rest, None)) => {
+                remaining = rest;
                 break;
             }
-
-            let start_pos = position;
-            let token = match chars[position] {
-                '=' => {
-                    position += 1;
-                    Token::Assign
-                }
-                ';' => {
-                    position += 1;
-                    Token::Semicolon
-                }
-                ':' => {
-                    position += 1;
-                    Token::Colon
-                }
-                c if c.is_ascii_digit() => {
-                    let start = position;
-                    while position < chars.len() && chars[position].is_ascii_digit() {
-                        position += 1;
-                    }
-                    let number_str: String = chars[start..position].iter().collect();
-                    Token::Number(number_str.parse().unwrap_or(0))
-                }
-                c if c.is_alphabetic() => {
-                    let start = position;
-                    while position < chars.len() && (chars[position].is_alphanumeric()) {
-                        position += 1;
-                    }
-                    let identifier: String = chars[start..position].iter().collect();
-                    match identifier.as_str() {
-                        "let" => Token::Let,
-                        _ => Token::Identifier(identifier),
-                    }
-                }
-                c => {
-                    return Err(TokenizeError::ParseError(format!(
-                        "Unexpected character: '{}'",
-                        c
-                    )));
-                }
-            };
-
-            let end_pos = position;
-            let span = Span::new(start_pos, end_pos, 1, 1);
-            tokens.push(TokenWithSpan::new(token, span));
+            Err(_) => break,
         }
-
-        // Add EOF token
-        let span = Span::new(input.len(), input.len(), 1, 1);
-        tokens.push(TokenWithSpan::new(Token::Eof, span));
-
-        Ok(tokens)
     }
+
+    // Add EOF token
+    let eof_offset = original_input.len() - remaining.len();
+    let (line, column) = calculate_position(original_input, eof_offset);
+    let eof_span = Span::new(eof_offset, eof_offset, line, column);
+    tokens.push(TokenWithSpan::new(Token::Eof, eof_span));
+
+    Ok((remaining, tokens))
 }
