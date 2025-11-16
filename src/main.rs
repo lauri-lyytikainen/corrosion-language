@@ -1,4 +1,4 @@
-// mod lexer;
+mod lexer;
 // mod parser;
 // mod ast;
 // mod typechecker;

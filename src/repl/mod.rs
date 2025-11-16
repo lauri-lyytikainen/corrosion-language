@@ -1,3 +1,4 @@
+use crate::lexer::Tokenizer;
 use std::io::{self, Write};
 
 pub struct Repl {
@@ -10,38 +11,39 @@ pub struct Repl {
 
 impl Repl {
     pub fn new() -> Self {
-        Self { version : env!("CARGO_PKG_VERSION") }
+        Self {
+            version: env!("CARGO_PKG_VERSION"),
+        }
     }
-    
 
     pub fn run(&mut self) {
         println!("Corrosion Language REPL v{}", self.version);
         println!("Type 'exit' or 'quit' to exit\n");
 
         let mut input = String::new();
-        
+
         loop {
             print!("> ");
             io::stdout().flush().unwrap();
-            
+
             input.clear();
             match io::stdin().read_line(&mut input) {
                 Ok(_) => {
                     let line = input.trim();
-                    
+
                     if line == "exit" || line == "quit" {
                         println!("Goodbye!");
                         break;
                     }
-                    
+
                     if line.is_empty() {
                         continue;
                     }
-                    
+
                     if self.handle_command(line) {
                         continue;
                     }
-                    
+
                     match self.process_line(line) {
                         Ok(result) => println!("{}", result),
                         Err(error) => println!("Error: {}", error),
@@ -80,13 +82,19 @@ impl Repl {
     }
 
     fn process_line(&mut self, input: &str) -> Result<String, String> {
-        // TODO: Implement the full compilation pipeline
-        // 1. Tokenize the input using the lexer
+        // Step 1: Tokenize the input using the tokenizer
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize(input).map_err(|e| e.to_string())?;
+
+        // For now, just show the tokens
+        let token_strings: Vec<String> = tokens.iter().map(|t| format!("{:?}", t.token)).collect();
+
+        Ok(format!("Tokens: [{}]", token_strings.join(", ")))
+
+        // TODO: Continue with the compilation pipeline
         // 2. Parse tokens into an AST
         // 3. Type check the AST
         // 4. Interpret/evaluate the AST
-        
-        Ok(format!("Echo: {}", input))
     }
 }
 
