@@ -1,5 +1,5 @@
 [package]
-name = "corrosion_language"
+name = "corrosion-language"
 version = "0.1.0"
 edition = "2024"
 
