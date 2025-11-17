@@ -1,6 +1,8 @@
-use crate::ast::{Program, Statement, Expression, TypeExpression, Spanned};
-use crate::typechecker::{Type, TypedProgram, TypedStatement, TypedExpression, BinaryOp, Environment};
+use crate::ast::{Expression, Program, Spanned, Statement, TypeExpression};
 use crate::lexer::tokens::Span;
+use crate::typechecker::{
+    BinaryOp, Environment, Type, TypedExpression, TypedProgram, TypedStatement,
+};
 
 /// Type checking errors
 #[derive(Debug, Clone)]
@@ -30,20 +32,41 @@ impl std::fmt::Display for TypeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TypeError::UndefinedVariable { name, span } => {
-                write!(f, "Undefined variable '{}' at line {}, column {}", 
-                       name, span.line, span.column)
+                write!(
+                    f,
+                    "Undefined variable '{}' at line {}, column {}",
+                    name, span.line, span.column
+                )
             }
-            TypeError::TypeMismatch { expected, found, span } => {
-                write!(f, "Type mismatch at line {}, column {}: expected '{}', found '{}'", 
-                       span.line, span.column, expected, found)
+            TypeError::TypeMismatch {
+                expected,
+                found,
+                span,
+            } => {
+                write!(
+                    f,
+                    "Type mismatch at line {}, column {}: expected '{}', found '{}'",
+                    span.line, span.column, expected, found
+                )
             }
-            TypeError::InvalidBinaryOperation { left, op, right, span } => {
-                write!(f, "Invalid binary operation at line {}, column {}: '{}' {:?} '{}'", 
-                       span.line, span.column, left, op, right)
+            TypeError::InvalidBinaryOperation {
+                left,
+                op,
+                right,
+                span,
+            } => {
+                write!(
+                    f,
+                    "Invalid binary operation at line {}, column {}: '{}' {:?} '{}'",
+                    span.line, span.column, left, op, right
+                )
             }
             TypeError::RedefinedVariable { name, span } => {
-                write!(f, "Variable '{}' redefined at line {}, column {}", 
-                       name, span.line, span.column)
+                write!(
+                    f,
+                    "Variable '{}' redefined at line {}, column {}",
+                    name, span.line, span.column
+                )
             }
         }
     }
@@ -89,7 +112,12 @@ impl TypeChecker {
     /// Type check a statement
     fn check_statement(&mut self, statement: &Statement) -> TypeResult<TypedStatement> {
         match statement {
-            Statement::VariableDeclaration { name, type_annotation, value, span } => {
+            Statement::VariableDeclaration {
+                name,
+                type_annotation,
+                value,
+                span,
+            } => {
                 // Check if variable is already defined in current scope
                 if self.environment.is_bound_locally(name) {
                     return Err(TypeError::RedefinedVariable {
@@ -105,10 +133,11 @@ impl TypeChecker {
                 // If there's a type annotation, check it matches the inferred type
                 let final_type = if let Some(annotation) = type_annotation {
                     let annotated_type = self.convert_type_expression(annotation)?;
-                    
+
                     // Special handling for function types with Unknown parameters/results
-                    let refined_type = self.refine_type_with_annotation(&inferred_type, &annotated_type)?;
-                    
+                    let refined_type =
+                        self.refine_type_with_annotation(&inferred_type, &annotated_type)?;
+
                     if !self.types_compatible(&annotated_type, &refined_type) {
                         return Err(TypeError::TypeMismatch {
                             expected: annotated_type,
@@ -150,25 +179,26 @@ impl TypeChecker {
             Expression::Boolean { value: _, span } => {
                 Ok(TypedExpression::new(Type::Bool, span.clone()))
             }
-            Expression::Identifier { name, span } => {
-                match self.environment.lookup(name) {
-                    Some(ty) => Ok(TypedExpression::new(ty.clone(), span.clone())),
-                    None => Err(TypeError::UndefinedVariable {
-                        name: name.clone(),
-                        span: span.clone(),
-                    }),
-                }
-            }
-            Expression::BinaryOp { left, operator, right, span } => {
+            Expression::Identifier { name, span } => match self.environment.lookup(name) {
+                Some(ty) => Ok(TypedExpression::new(ty.clone(), span.clone())),
+                None => Err(TypeError::UndefinedVariable {
+                    name: name.clone(),
+                    span: span.clone(),
+                }),
+            },
+            Expression::BinaryOp {
+                left,
+                operator,
+                right,
+                span,
+            } => {
                 let typed_left = self.check_expression(left)?;
                 let typed_right = self.check_expression(right)?;
-                
+
                 let op = BinaryOp::from(operator.clone());
-                
+
                 match typed_left.ty.can_binary_op(&op, &typed_right.ty) {
-                    Some(result_type) => {
-                        Ok(TypedExpression::new(result_type, span.clone()))
-                    }
+                    Some(result_type) => Ok(TypedExpression::new(result_type, span.clone())),
                     None => Err(TypeError::InvalidBinaryOperation {
                         left: typed_left.ty,
                         op,
@@ -180,25 +210,27 @@ impl TypeChecker {
             Expression::Function { param, body, span } => {
                 // Use type inference to determine parameter type
                 let param_type = self.infer_parameter_type(param, body)?;
-                
+
                 // Create a new type checker with a child environment for the function scope
                 let mut function_checker = TypeChecker {
                     environment: Environment::with_parent(self.environment.clone()),
                     errors: Vec::new(),
                 };
-                
+
                 // Bind the parameter in the function's scope
-                function_checker.environment.bind(param.clone(), param_type.clone());
-                
+                function_checker
+                    .environment
+                    .bind(param.clone(), param_type.clone());
+
                 // Type check the function body
                 let typed_body = function_checker.check_expression(body)?;
-                
+
                 // Create the function type
                 let function_type = Type::Function {
                     param: Box::new(param_type),
                     result: Box::new(typed_body.ty.clone()),
                 };
-                
+
                 Ok(TypedExpression::new(function_type, span.clone()))
             }
             Expression::FunctionCall { .. } => {
@@ -207,8 +239,20 @@ impl TypeChecker {
             Expression::List { .. } => {
                 Ok(TypedExpression::new(Type::Error, expression.span().clone()))
             }
-            Expression::Pair { .. } => {
-                Ok(TypedExpression::new(Type::Error, expression.span().clone()))
+            Expression::Pair {
+                first,
+                second,
+                span,
+            } => {
+                let typed_first = self.check_expression(first)?;
+                let typed_second = self.check_expression(second)?;
+
+                let pair_type = Type::Pair {
+                    first: Box::new(typed_first.ty.clone()),
+                    second: Box::new(typed_second.ty.clone()),
+                };
+
+                Ok(TypedExpression::new(pair_type, span.clone()))
             }
             Expression::LeftInject { .. } => {
                 Ok(TypedExpression::new(Type::Error, expression.span().clone()))
@@ -232,26 +276,39 @@ impl TypeChecker {
             TypeExpression::Bool { .. } => Ok(Type::Bool),
             TypeExpression::List { element, .. } => {
                 let element_type = self.convert_type_expression(element)?;
-                Ok(Type::List { element: Box::new(element_type) })
+                Ok(Type::List {
+                    element: Box::new(element_type),
+                })
             }
             TypeExpression::Function { param, result, .. } => {
                 let param_type = self.convert_type_expression(param)?;
                 let result_type = self.convert_type_expression(result)?;
-                Ok(Type::Function { param: Box::new(param_type), result: Box::new(result_type) })
+                Ok(Type::Function {
+                    param: Box::new(param_type),
+                    result: Box::new(result_type),
+                })
             }
             TypeExpression::Pair { first, second, .. } => {
                 let first_type = self.convert_type_expression(first)?;
                 let second_type = self.convert_type_expression(second)?;
-                Ok(Type::Pair { first: Box::new(first_type), second: Box::new(second_type) })
+                Ok(Type::Pair {
+                    first: Box::new(first_type),
+                    second: Box::new(second_type),
+                })
             }
             TypeExpression::Sum { left, right, .. } => {
                 let left_type = self.convert_type_expression(left)?;
                 let right_type = self.convert_type_expression(right)?;
-                Ok(Type::Sum { left: Box::new(left_type), right: Box::new(right_type) })
+                Ok(Type::Sum {
+                    left: Box::new(left_type),
+                    right: Box::new(right_type),
+                })
             }
             TypeExpression::Recursive { inner, .. } => {
                 let inner_type = self.convert_type_expression(inner)?;
-                Ok(Type::Recursive { inner: Box::new(inner_type) })
+                Ok(Type::Recursive {
+                    inner: Box::new(inner_type),
+                })
             }
             TypeExpression::Named { name, span } => {
                 // For now, we don't support named types - this could be extended later
@@ -267,23 +324,30 @@ impl TypeChecker {
     fn refine_type_with_annotation(&self, inferred: &Type, annotated: &Type) -> TypeResult<Type> {
         match (inferred, annotated) {
             // If the inferred type has Unknown components, use the annotated type
-            (Type::Function { param: inf_param, result: inf_result }, 
-             Type::Function { param: ann_param, result: ann_result }) => {
-                
+            (
+                Type::Function {
+                    param: inf_param,
+                    result: inf_result,
+                },
+                Type::Function {
+                    param: ann_param,
+                    result: ann_result,
+                },
+            ) => {
                 // If inferred parameter is Unknown, use annotated parameter type
                 let refined_param = if matches!(**inf_param, Type::Unknown) {
                     ann_param.clone()
                 } else {
                     inf_param.clone()
                 };
-                
+
                 // If inferred result is Unknown, use annotated result type
                 let refined_result = if matches!(**inf_result, Type::Unknown) {
                     ann_result.clone()
                 } else {
                     inf_result.clone()
                 };
-                
+
                 Ok(Type::Function {
                     param: refined_param,
                     result: refined_result,
@@ -299,12 +363,19 @@ impl TypeChecker {
         match (t1, t2) {
             // Unknown types are compatible with anything
             (Type::Unknown, _) | (_, Type::Unknown) => true,
-            
+
             // Function types are compatible if their parameters and results are compatible
-            (Type::Function { param: p1, result: r1 }, Type::Function { param: p2, result: r2 }) => {
-                self.types_compatible(p1, p2) && self.types_compatible(r1, r2)
-            }
-            
+            (
+                Type::Function {
+                    param: p1,
+                    result: r1,
+                },
+                Type::Function {
+                    param: p2,
+                    result: r2,
+                },
+            ) => self.types_compatible(p1, p2) && self.types_compatible(r1, r2),
+
             // Otherwise, use structural equality
             _ => t1 == t2,
         }
@@ -345,19 +416,24 @@ impl TypeChecker {
                 // Parameter is used directly - we need more context to infer type
                 None
             }
-            Expression::BinaryOp { left, operator, right, .. } => {
+            Expression::BinaryOp {
+                left,
+                operator,
+                right,
+                ..
+            } => {
                 // Check if parameter is used in arithmetic operations
                 let left_uses_param = self.expression_uses_parameter(param, left);
                 let right_uses_param = self.expression_uses_parameter(param, right);
-                
+
                 if left_uses_param || right_uses_param {
                     match operator {
-                        crate::ast::BinaryOperator::Add | 
-                        crate::ast::BinaryOperator::Subtract |
-                        crate::ast::BinaryOperator::Multiply |
-                        crate::ast::BinaryOperator::Divide => Some(Type::Int),
-                        crate::ast::BinaryOperator::LogicalAnd |
-                        crate::ast::BinaryOperator::LogicalOr => Some(Type::Bool),
+                        crate::ast::BinaryOperator::Add
+                        | crate::ast::BinaryOperator::Subtract
+                        | crate::ast::BinaryOperator::Multiply
+                        | crate::ast::BinaryOperator::Divide => Some(Type::Int),
+                        crate::ast::BinaryOperator::LogicalAnd
+                        | crate::ast::BinaryOperator::LogicalOr => Some(Type::Bool),
                         _ => None,
                     }
                 } else {
@@ -366,7 +442,9 @@ impl TypeChecker {
                         .or_else(|| self.analyze_parameter_usage(param, right))
                 }
             }
-            Expression::FunctionCall { function, argument, .. } => {
+            Expression::FunctionCall {
+                function, argument, ..
+            } => {
                 // If parameter is used as a function, infer it's a function type
                 if let Expression::Identifier { name, .. } = function.as_ref() {
                     if name == param {
@@ -378,19 +456,23 @@ impl TypeChecker {
                         });
                     }
                 }
-                
+
                 // Recursively check sub-expressions
                 self.analyze_parameter_usage(param, function)
                     .or_else(|| self.analyze_parameter_usage(param, argument))
             }
-            Expression::Block { statements, expression, .. } => {
+            Expression::Block {
+                statements,
+                expression,
+                ..
+            } => {
                 // Check statements first
                 for stmt in statements {
                     if let Some(ty) = self.analyze_parameter_usage_in_statement(param, stmt) {
                         return Some(ty);
                     }
                 }
-                
+
                 // Check final expression
                 if let Some(expr) = expression {
                     self.analyze_parameter_usage(param, expr)
@@ -407,16 +489,26 @@ impl TypeChecker {
         match expr {
             Expression::Identifier { name, .. } => name == param,
             Expression::BinaryOp { left, right, .. } => {
-                self.expression_uses_parameter(param, left) ||
-                self.expression_uses_parameter(param, right)
+                self.expression_uses_parameter(param, left)
+                    || self.expression_uses_parameter(param, right)
             }
-            Expression::FunctionCall { function, argument, .. } => {
-                self.expression_uses_parameter(param, function) ||
-                self.expression_uses_parameter(param, argument)
+            Expression::FunctionCall {
+                function, argument, ..
+            } => {
+                self.expression_uses_parameter(param, function)
+                    || self.expression_uses_parameter(param, argument)
             }
-            Expression::Block { statements, expression, .. } => {
-                statements.iter().any(|stmt| self.statement_uses_parameter(param, stmt)) ||
-                expression.as_ref().map_or(false, |expr| self.expression_uses_parameter(param, expr))
+            Expression::Block {
+                statements,
+                expression,
+                ..
+            } => {
+                statements
+                    .iter()
+                    .any(|stmt| self.statement_uses_parameter(param, stmt))
+                    || expression
+                        .as_ref()
+                        .map_or(false, |expr| self.expression_uses_parameter(param, expr))
             }
             _ => false,
         }

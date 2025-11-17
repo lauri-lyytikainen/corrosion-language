@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use crate::lexer::tokens::{Token, TokenWithSpan, Span};
-    use crate::ast::{Parser, Statement, Expression};
     use crate::ast::parser::ParseError;
+    use crate::ast::{Expression, Parser, Statement};
+    use crate::lexer::tokens::{Span, Token, TokenWithSpan};
 
     fn create_test_span() -> Span {
         Span::new(0, 1, 1, 1)
@@ -25,14 +25,12 @@ mod tests {
 
         assert_eq!(program.statements.len(), 1);
         match &program.statements[0] {
-            Statement::Expression { expression, .. } => {
-                match expression {
-                    Expression::Number { value, .. } => {
-                        assert_eq!(*value, 42);
-                    }
-                    _ => panic!("Expected number expression"),
+            Statement::Expression { expression, .. } => match expression {
+                Expression::Number { value, .. } => {
+                    assert_eq!(*value, 42);
                 }
-            }
+                _ => panic!("Expected number expression"),
+            },
             _ => panic!("Expected expression statement"),
         }
     }
@@ -50,14 +48,12 @@ mod tests {
 
         assert_eq!(program.statements.len(), 1);
         match &program.statements[0] {
-            Statement::Expression { expression, .. } => {
-                match expression {
-                    Expression::Identifier { name, .. } => {
-                        assert_eq!(name, "x");
-                    }
-                    _ => panic!("Expected identifier expression"),
+            Statement::Expression { expression, .. } => match expression {
+                Expression::Identifier { name, .. } => {
+                    assert_eq!(name, "x");
                 }
-            }
+                _ => panic!("Expected identifier expression"),
+            },
             _ => panic!("Expected expression statement"),
         }
     }
@@ -108,7 +104,7 @@ mod tests {
         let program = parser.parse().unwrap();
 
         assert_eq!(program.statements.len(), 2);
-        
+
         // First statement: let x = 42;
         match &program.statements[0] {
             Statement::VariableDeclaration { name, .. } => {
@@ -119,14 +115,12 @@ mod tests {
 
         // Second statement: y;
         match &program.statements[1] {
-            Statement::Expression { expression, .. } => {
-                match expression {
-                    Expression::Identifier { name, .. } => {
-                        assert_eq!(name, "y");
-                    }
-                    _ => panic!("Expected identifier expression"),
+            Statement::Expression { expression, .. } => match expression {
+                Expression::Identifier { name, .. } => {
+                    assert_eq!(name, "y");
                 }
-            }
+                _ => panic!("Expected identifier expression"),
+            },
             _ => panic!("Expected expression statement"),
         }
     }
@@ -144,7 +138,9 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            ParseError::UnexpectedToken { expected, found, .. } => {
+            ParseError::UnexpectedToken {
+                expected, found, ..
+            } => {
                 assert_eq!(expected, "identifier");
                 assert_eq!(found, Token::Number(42));
             }
@@ -160,5 +156,102 @@ mod tests {
         let program = parser.parse().unwrap();
 
         assert_eq!(program.statements.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_pair_expression() {
+        let tokens = vec![
+            create_token_with_span(Token::LeftParen),
+            create_token_with_span(Token::Number(1)),
+            create_token_with_span(Token::Comma),
+            create_token_with_span(Token::Number(2)),
+            create_token_with_span(Token::RightParen),
+            create_token_with_span(Token::Semicolon),
+            create_token_with_span(Token::Eof),
+        ];
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.statements.len(), 1);
+        match &program.statements[0] {
+            Statement::Expression { expression, .. } => match expression {
+                Expression::Pair { first, second, .. } => {
+                    match first.as_ref() {
+                        Expression::Number { value: 1, .. } => (),
+                        _ => panic!("Expected first element to be number 1"),
+                    }
+                    match second.as_ref() {
+                        Expression::Number { value: 2, .. } => (),
+                        _ => panic!("Expected second element to be number 2"),
+                    }
+                }
+                _ => panic!("Expected pair expression, got {:?}", expression),
+            },
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_pair_variable_declaration() {
+        let tokens = vec![
+            create_token_with_span(Token::Let),
+            create_token_with_span(Token::Identifier("pair".to_string())),
+            create_token_with_span(Token::Assign),
+            create_token_with_span(Token::LeftParen),
+            create_token_with_span(Token::True),
+            create_token_with_span(Token::Comma),
+            create_token_with_span(Token::False),
+            create_token_with_span(Token::RightParen),
+            create_token_with_span(Token::Semicolon),
+            create_token_with_span(Token::Eof),
+        ];
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.statements.len(), 1);
+        match &program.statements[0] {
+            Statement::VariableDeclaration { name, value, .. } => {
+                assert_eq!(name, "pair");
+                match value {
+                    Expression::Pair { first, second, .. } => {
+                        match first.as_ref() {
+                            Expression::Boolean { value: true, .. } => (),
+                            _ => panic!("Expected first element to be true"),
+                        }
+                        match second.as_ref() {
+                            Expression::Boolean { value: false, .. } => (),
+                            _ => panic!("Expected second element to be false"),
+                        }
+                    }
+                    _ => panic!("Expected pair expression"),
+                }
+            }
+            _ => panic!("Expected variable declaration"),
+        }
+    }
+
+    #[test]
+    fn test_parse_parenthesized_expression() {
+        let tokens = vec![
+            create_token_with_span(Token::LeftParen),
+            create_token_with_span(Token::Number(42)),
+            create_token_with_span(Token::RightParen),
+            create_token_with_span(Token::Semicolon),
+            create_token_with_span(Token::Eof),
+        ];
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.statements.len(), 1);
+        match &program.statements[0] {
+            Statement::Expression { expression, .. } => match expression {
+                Expression::Number { value: 42, .. } => (),
+                _ => panic!("Expected number expression, got {:?}", expression),
+            },
+            _ => panic!("Expected expression statement"),
+        }
     }
 }

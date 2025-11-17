@@ -960,6 +960,84 @@ mod tests {
     }
 
     #[test]
+    fn test_pair_expression_type_checking() {
+        let mut type_checker = TypeChecker::new();
+
+        // Create a pair expression (1, true)
+        let pair_expr = Expression::Pair {
+            first: Box::new(Expression::Number {
+                value: 1,
+                span: create_test_span(),
+            }),
+            second: Box::new(Expression::Boolean {
+                value: true,
+                span: create_test_span(),
+            }),
+            span: create_test_span(),
+        };
+
+        // Type check the pair expression
+        let typed_expr = type_checker.check_expression(&pair_expr).unwrap();
+
+        // Should have pair type (Int, Bool)
+        match &typed_expr.ty {
+            Type::Pair { first, second } => {
+                assert_eq!(**first, Type::Int);
+                assert_eq!(**second, Type::Bool);
+            }
+            _ => panic!("Expected pair type, got {:?}", typed_expr.ty),
+        }
+    }
+
+    #[test]
+    fn test_nested_pair_expression_type_checking() {
+        let mut type_checker = TypeChecker::new();
+
+        // Create a nested pair expression ((1, true), false)
+        let nested_pair_expr = Expression::Pair {
+            first: Box::new(Expression::Pair {
+                first: Box::new(Expression::Number {
+                    value: 1,
+                    span: create_test_span(),
+                }),
+                second: Box::new(Expression::Boolean {
+                    value: true,
+                    span: create_test_span(),
+                }),
+                span: create_test_span(),
+            }),
+            second: Box::new(Expression::Boolean {
+                value: false,
+                span: create_test_span(),
+            }),
+            span: create_test_span(),
+        };
+
+        // Type check the nested pair expression
+        let typed_expr = type_checker.check_expression(&nested_pair_expr).unwrap();
+
+        // Should have pair type ((Int, Bool), Bool)
+        match &typed_expr.ty {
+            Type::Pair { first, second } => {
+                // First should be (Int, Bool)
+                match first.as_ref() {
+                    Type::Pair {
+                        first: inner_first,
+                        second: inner_second,
+                    } => {
+                        assert_eq!(**inner_first, Type::Int);
+                        assert_eq!(**inner_second, Type::Bool);
+                    }
+                    _ => panic!("Expected nested pair type, got {:?}", first),
+                }
+                // Second should be Bool
+                assert_eq!(**second, Type::Bool);
+            }
+            _ => panic!("Expected pair type, got {:?}", typed_expr.ty),
+        }
+    }
+
+    #[test]
     fn test_all_basic_type_displays() {
         assert_eq!(format!("{}", Type::Int), "Int");
         assert_eq!(format!("{}", Type::Bool), "Bool");

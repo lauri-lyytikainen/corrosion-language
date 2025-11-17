@@ -216,6 +216,7 @@ impl Parser {
                 Ok(Expression::Identifier { name, span })
             }
             Token::Fn => self.parse_function_expression(),
+            Token::LeftParen => self.parse_parenthesized_or_pair_expression(),
             token => Err(ParseError::UnexpectedToken {
                 expected: "expression".to_string(),
                 found: token,
@@ -256,6 +257,38 @@ impl Parser {
         );
 
         Ok(Expression::Function { param, body, span })
+    }
+
+    fn parse_parenthesized_or_pair_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        // Parse the first expression
+        let first = self.parse_expression()?;
+
+        // Check if this is a pair (has a comma) or just a parenthesized expression
+        if self.peek().token == Token::Comma {
+            self.advance(); // consume ','
+            let second = Box::new(self.parse_expression()?);
+            self.consume(Token::RightParen, "Expected ')' after pair")?;
+
+            let end_span = self.previous_span();
+            let span = Span::new(
+                start_span.start,
+                end_span.end,
+                start_span.line,
+                start_span.column,
+            );
+
+            Ok(Expression::Pair {
+                first: Box::new(first),
+                second,
+                span,
+            })
+        } else {
+            // Just a parenthesized expression
+            self.consume(Token::RightParen, "Expected ')'")?;
+            Ok(first)
+        }
     }
 
     fn parse_type_expression(&mut self) -> ParseResult<TypeExpression> {
