@@ -3,16 +3,55 @@ pub enum Token {
     // Keywords
     Let,
 
+    // Type keywords
+    Int,  // Int
+    Bool, // Bool
+    List, // List
+    Rec,  // Rec
+
+    // Function keywords
+    Fn,  // fn
+    Fix, // fix
+
+    // Sum type constructors
+    Inl, // inl (left injection)
+    Inr, // inr (right injection)
+
+    // Boolean literals
+    True,  // true
+    False, // false
+
     // Identifiers and literals
     Identifier(String),
     Number(i64),
 
     // Operators
-    Assign, // =
+    Assign,           // =
+    Arrow,            // ->
+    Plus,             // +
+    Minus,            // -
+    Multiply,         // *
+    Divide,           // /
+    Equal,            // ==
+    NotEqual,         // !=
+    LessThan,         // <
+    LessThanEqual,    // <=
+    GreaterThan,      // >
+    GreaterThanEqual, // >=
+    LogicalAnd,       // &&
+    LogicalOr,        // ||
+    LogicalNot,       // !
 
     // Punctuation
-    Semicolon, // ;
-    Colon,     // :
+    Semicolon,    // ;
+    Colon,        // :
+    LeftParen,    // (
+    RightParen,   // )
+    LeftBracket,  // [
+    RightBracket, // ]
+    LeftBrace,    // {
+    RightBrace,   // }
+    Comma,        // ,
 
     // Special
     Eof,

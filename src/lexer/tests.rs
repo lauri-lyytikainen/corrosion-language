@@ -365,4 +365,70 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn test_new_keywords() {
+        let tokens = tokenize_input("fn fix inl inr").unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Fn,
+                Token::Fix,
+                Token::Inl,
+                Token::Inr,
+                Token::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn test_new_operators() {
+        let tokens = tokenize_input("== != <= >= && || !").unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Equal,
+                Token::NotEqual,
+                Token::LessThanEqual,
+                Token::GreaterThanEqual,
+                Token::LogicalAnd,
+                Token::LogicalOr,
+                Token::LogicalNot,
+                Token::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn test_new_punctuation() {
+        let tokens = tokenize_input("{ }").unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                Token::LeftBrace,
+                Token::RightBrace,
+                Token::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn test_function_syntax_tokenization() {
+        let tokens = tokenize_input("fn(x) { x + 1 }").unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Fn,
+                Token::LeftParen,
+                Token::Identifier("x".to_string()),
+                Token::RightParen,
+                Token::LeftBrace,
+                Token::Identifier("x".to_string()),
+                Token::Plus,
+                Token::Number(1),
+                Token::RightBrace,
+                Token::Eof
+            ]
+        );
+    }
 }

@@ -1,5 +1,6 @@
 use crate::lexer::Tokenizer;
 use crate::ast::Parser;
+use crate::typechecker::TypeChecker;
 use std::io::{self, Write};
 
 pub struct Repl {
@@ -91,11 +92,14 @@ impl Repl {
         let mut parser = Parser::new(tokens);
         let program = parser.parse().map_err(|e| e.to_string())?;
 
-        // For now, show both tokens and AST
-        Ok(format!("AST: {:#?}", program))
+        // Step 3: Type check the AST
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).map_err(|e| e.to_string())?;
+
+        // For now, show the typed AST
+        Ok(format!("Typed AST: {:#?}", typed_program))
 
         // TODO: Continue with the compilation pipeline
-        // 3. Type check the AST
         // 4. Interpret/evaluate the AST
     }
 }

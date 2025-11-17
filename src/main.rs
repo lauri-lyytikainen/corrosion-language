@@ -1,8 +1,9 @@
-pub mod lexer;
 pub mod ast;
-// mod typechecker;
+pub mod lexer;
+pub mod typechecker;
 // mod interpreter;
 mod repl;
+mod tests;
 
 use repl::Repl;
 

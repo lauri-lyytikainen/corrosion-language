@@ -63,6 +63,16 @@ fn parse_identifier_or_keyword(input: &str) -> IResult<&str, Token> {
     recognize(pair(alpha1, many0(alt((alphanumeric1, tag("_"))))))
         .map(|s: &str| match s {
             "let" => Token::Let,
+            "Int" => Token::Int,
+            "Bool" => Token::Bool,
+            "List" => Token::List,
+            "Rec" => Token::Rec,
+            "fn" => Token::Fn,
+            "fix" => Token::Fix,
+            "inl" => Token::Inl,
+            "inr" => Token::Inr,
+            "true" => Token::True,
+            "false" => Token::False,
             _ => Token::Identifier(s.to_string()),
         })
         .parse(input)
@@ -84,13 +94,134 @@ fn parse_colon(input: &str) -> IResult<&str, Token> {
     value(Token::Colon, char(':')).parse(input)
 }
 
-fn parse_single_token(input: &str) -> IResult<&str, Token> {
+fn parse_arrow(input: &str) -> IResult<&str, Token> {
+    value(Token::Arrow, tag("->")).parse(input)
+}
+
+fn parse_plus(input: &str) -> IResult<&str, Token> {
+    value(Token::Plus, char('+')).parse(input)
+}
+
+fn parse_minus(input: &str) -> IResult<&str, Token> {
+    value(Token::Minus, char('-')).parse(input)
+}
+
+fn parse_multiply(input: &str) -> IResult<&str, Token> {
+    value(Token::Multiply, char('*')).parse(input)
+}
+
+fn parse_divide(input: &str) -> IResult<&str, Token> {
+    value(Token::Divide, char('/')).parse(input)
+}
+
+fn parse_left_paren(input: &str) -> IResult<&str, Token> {
+    value(Token::LeftParen, char('(')).parse(input)
+}
+
+fn parse_right_paren(input: &str) -> IResult<&str, Token> {
+    value(Token::RightParen, char(')')).parse(input)
+}
+
+fn parse_left_bracket(input: &str) -> IResult<&str, Token> {
+    value(Token::LeftBracket, char('[')).parse(input)
+}
+
+fn parse_right_bracket(input: &str) -> IResult<&str, Token> {
+    value(Token::RightBracket, char(']')).parse(input)
+}
+
+fn parse_comma(input: &str) -> IResult<&str, Token> {
+    value(Token::Comma, char(',')).parse(input)
+}
+
+fn parse_left_brace(input: &str) -> IResult<&str, Token> {
+    value(Token::LeftBrace, char('{')).parse(input)
+}
+
+fn parse_right_brace(input: &str) -> IResult<&str, Token> {
+    value(Token::RightBrace, char('}')).parse(input)
+}
+
+fn parse_equal(input: &str) -> IResult<&str, Token> {
+    value(Token::Equal, tag("==")).parse(input)
+}
+
+fn parse_not_equal(input: &str) -> IResult<&str, Token> {
+    value(Token::NotEqual, tag("!=")).parse(input)
+}
+
+fn parse_less_than_equal(input: &str) -> IResult<&str, Token> {
+    value(Token::LessThanEqual, tag("<=")).parse(input)
+}
+
+fn parse_greater_than_equal(input: &str) -> IResult<&str, Token> {
+    value(Token::GreaterThanEqual, tag(">=")).parse(input)
+}
+
+fn parse_less_than(input: &str) -> IResult<&str, Token> {
+    value(Token::LessThan, char('<')).parse(input)
+}
+
+fn parse_greater_than(input: &str) -> IResult<&str, Token> {
+    value(Token::GreaterThan, char('>')).parse(input)
+}
+
+fn parse_logical_and(input: &str) -> IResult<&str, Token> {
+    value(Token::LogicalAnd, tag("&&")).parse(input)
+}
+
+fn parse_logical_or(input: &str) -> IResult<&str, Token> {
+    value(Token::LogicalOr, tag("||")).parse(input)
+}
+
+fn parse_logical_not(input: &str) -> IResult<&str, Token> {
+    value(Token::LogicalNot, char('!')).parse(input)
+}
+
+fn parse_operators(input: &str) -> IResult<&str, Token> {
     alt((
-        parse_identifier_or_keyword,
-        parse_number,
+        // Multi-character operators must come before their prefixes
+        parse_arrow,              // -> must come before -
+        parse_equal,              // == must come before =
+        parse_not_equal,          // != must come before !
+        parse_less_than_equal,    // <= must come before <
+        parse_greater_than_equal, // >= must come before >
+        parse_logical_and,        // && must come before individual &
+        parse_logical_or,         // || must come before individual |
+        // Single character operators
         parse_assign,
+        parse_plus,
+        parse_minus,
+        parse_multiply,
+        parse_divide,
+        parse_less_than,
+        parse_greater_than,
+        parse_logical_not,
+    ))
+    .parse(input)
+}
+
+fn parse_punctuation(input: &str) -> IResult<&str, Token> {
+    alt((
         parse_semicolon,
         parse_colon,
+        parse_left_paren,
+        parse_right_paren,
+        parse_left_bracket,
+        parse_right_bracket,
+        parse_left_brace,
+        parse_right_brace,
+        parse_comma,
+    ))
+    .parse(input)
+}
+
+fn parse_single_token(input: &str) -> IResult<&str, Token> {
+    alt((
+        parse_operators,
+        parse_identifier_or_keyword,
+        parse_number,
+        parse_punctuation,
     ))
     .parse(input)
 }
