@@ -1,6 +1,5 @@
 pub mod lexer;
-// mod parser;
-// mod ast;
+pub mod ast;
 // mod typechecker;
 // mod interpreter;
 mod repl;

@@ -1,4 +1,5 @@
 use crate::lexer::Tokenizer;
+use crate::ast::Parser;
 use std::io::{self, Write};
 
 pub struct Repl {
@@ -86,13 +87,14 @@ impl Repl {
         let mut tokenizer = Tokenizer::new("");
         let tokens = tokenizer.tokenize(input).map_err(|e| e.to_string())?;
 
-        // For now, just show the tokens
-        let token_strings: Vec<String> = tokens.iter().map(|t| format!("{:?}", t.token)).collect();
+        // Step 2: Parse tokens into an AST
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().map_err(|e| e.to_string())?;
 
-        Ok(format!("Tokens: [{}]", token_strings.join(", ")))
+        // For now, show both tokens and AST
+        Ok(format!("AST: {:#?}", program))
 
         // TODO: Continue with the compilation pipeline
-        // 2. Parse tokens into an AST
         // 3. Type check the AST
         // 4. Interpret/evaluate the AST
     }
