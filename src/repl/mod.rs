@@ -1,5 +1,5 @@
-use crate::lexer::Tokenizer;
 use crate::ast::Parser;
+use crate::lexer::Tokenizer;
 use crate::typechecker::TypeChecker;
 use std::io::{self, Write};
 
@@ -60,33 +60,74 @@ impl Repl {
     }
 
     fn handle_command(&mut self, line: &str) -> bool {
-        match line {
-            "help" | ":help" => {
-                self.show_help();
-                true
+        if let Some(cmd) = line.strip_prefix(':') {
+            match cmd {
+                "help" => {
+                    self.show_help();
+                    true
+                }
+                "clear" => {
+                    // TODO: Better clear screen implementation
+                    print!("{}[2J{}[H", 27 as char, 27 as char);
+                    true
+                }
+                _ if cmd.starts_with("load ") => {
+                    let filename = cmd.strip_prefix("load ").unwrap().trim();
+                    match self.load_file(filename) {
+                        Ok(result) => println!("{}", result),
+                        Err(error) => println!("Error loading file: {}", error),
+                    }
+                    true
+                }
+                _ => {
+                    println!("Unknown command: :{}", cmd);
+                    println!("Type ':help' for available commands.");
+                    true
+                }
             }
-            "clear" | ":clear" => {
-                // TODO: Better clear screen implementation
-                print!("{}[2J{}[H", 27 as char, 27 as char);
-                true
+        } else {
+            match line {
+                "help" | ":help" => {
+                    self.show_help();
+                    true
+                }
+                "clear" | ":clear" => {
+                    print!("{}[2J{}[H", 27 as char, 27 as char);
+                    true
+                }
+                _ => false,
             }
-            _ => false,
         }
     }
 
     fn show_help(&self) {
         println!("Corrosion Language REPL Commands:");
-        println!("  help, :help     - Show this help message");
-        println!("  clear, :clear   - Clear the screen");
-        println!("  exit, quit      - Exit the REPL");
-        println!("  <expression>    - Evaluate a Corrosion expression");
+        println!("  help, :help       - Show this help message");
+        println!("  clear, :clear     - Clear the screen");
+        println!("  :load <filename>  - Load and execute a Corrosion file");
+        println!("  exit, quit        - Exit the REPL");
+        println!("  <expression>      - Evaluate a Corrosion expression");
         println!();
     }
 
-    fn process_line(&mut self, input: &str) -> Result<String, String> {
+    fn load_file(&mut self, filename: &str) -> Result<String, String> {
+        use std::fs;
+
+        // Read the file contents
+        let contents = fs::read_to_string(filename)
+            .map_err(|e| format!("Failed to read file '{}': {}", filename, e))?;
+
+        // Process the file contents using the same pipeline as process_line
+        match self.process_content(&contents) {
+            Ok(result) => Ok(format!("Successfully loaded '{}': {}", filename, result)),
+            Err(error) => Err(format!("Error processing '{}': {}", filename, error)),
+        }
+    }
+
+    fn process_content(&mut self, content: &str) -> Result<String, String> {
         // Step 1: Tokenize the input using the tokenizer
         let mut tokenizer = Tokenizer::new("");
-        let tokens = tokenizer.tokenize(input).map_err(|e| e.to_string())?;
+        let tokens = tokenizer.tokenize(content).map_err(|e| e.to_string())?;
 
         // Step 2: Parse tokens into an AST
         let mut parser = Parser::new(tokens);
@@ -94,13 +135,16 @@ impl Repl {
 
         // Step 3: Type check the AST
         let mut type_checker = TypeChecker::new();
-        let typed_program = type_checker.check_program(&program).map_err(|e| e.to_string())?;
+        let typed_program = type_checker
+            .check_program(&program)
+            .map_err(|e| e.to_string())?;
 
         // For now, show the typed AST
         Ok(format!("Typed AST: {:#?}", typed_program))
+    }
 
-        // TODO: Continue with the compilation pipeline
-        // 4. Interpret/evaluate the AST
+    fn process_line(&mut self, input: &str) -> Result<String, String> {
+        self.process_content(input)
     }
 }
 

@@ -6,8 +6,63 @@ mod repl;
 mod tests;
 
 use repl::Repl;
+use std::env;
+use std::process;
 
 fn main() {
-    let mut repl = Repl::new();
-    repl.run();
+    let args: Vec<String> = env::args().collect();
+
+    match args.len() {
+        1 => {
+            // No arguments - start REPL
+            let mut repl = Repl::new();
+            repl.run();
+        }
+        2 => {
+            // One argument - load and execute file
+            let filename = &args[1];
+            if let Err(e) = load_and_execute_file(filename) {
+                eprintln!("Error: {}", e);
+                process::exit(1);
+            }
+        }
+        _ => {
+            eprintln!("Usage: {} [filename]", args[0]);
+            eprintln!("  - Run without arguments to start the REPL");
+            eprintln!("  - Provide a filename to execute that file");
+            process::exit(1);
+        }
+    }
+}
+
+fn load_and_execute_file(filename: &str) -> Result<(), String> {
+    use crate::ast::Parser;
+    use crate::lexer::Tokenizer;
+    use crate::typechecker::TypeChecker;
+    use std::fs;
+
+    // Read the file contents
+    let contents = fs::read_to_string(filename)
+        .map_err(|e| format!("Failed to read file '{}': {}", filename, e))?;
+
+    // Process the file contents
+    let mut tokenizer = Tokenizer::new("");
+    let tokens = tokenizer
+        .tokenize(&contents)
+        .map_err(|e| format!("Tokenization error: {}", e))?;
+
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse().map_err(|e| format!("Parse error: {}", e))?;
+
+    let mut type_checker = TypeChecker::new();
+    let typed_program = type_checker
+        .check_program(&program)
+        .map_err(|e| format!("Type error: {}", e))?;
+
+    // For now, just print the typed AST
+    // TODO: Add interpreter to actually execute the program
+    println!("Successfully loaded and type-checked '{}':", filename);
+    println!("{:#?}", typed_program);
+
+    Ok(())
 }
