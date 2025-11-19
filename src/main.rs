@@ -1,7 +1,7 @@
 pub mod ast;
 pub mod lexer;
 pub mod typechecker;
-// mod interpreter;
+pub mod interpreter;
 mod repl;
 mod tests;
 
@@ -39,6 +39,7 @@ fn load_and_execute_file(filename: &str) -> Result<(), String> {
     use crate::ast::Parser;
     use crate::lexer::Tokenizer;
     use crate::typechecker::TypeChecker;
+    use crate::interpreter::Interpreter;
     use std::fs;
 
     // Read the file contents
@@ -55,14 +56,17 @@ fn load_and_execute_file(filename: &str) -> Result<(), String> {
     let program = parser.parse().map_err(|e| format!("Parse error: {}", e))?;
 
     let mut type_checker = TypeChecker::new();
-    let typed_program = type_checker
+    let _typed_program = type_checker
         .check_program(&program)
         .map_err(|e| format!("Type error: {}", e))?;
 
-    // For now, just print the typed AST
-    // TODO: Add interpreter to actually execute the program
-    println!("Successfully loaded and type-checked '{}':", filename);
-    println!("{:#?}", typed_program);
+    // Execute the program with the interpreter
+    let mut interpreter = Interpreter::new();
+    let result = interpreter
+        .interpret_program(&program)
+        .map_err(|e| format!("Runtime error: {}", e))?;
+
+    println!("Program result: {}", result);
 
     Ok(())
 }

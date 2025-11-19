@@ -1,20 +1,21 @@
 use crate::ast::Parser;
 use crate::lexer::Tokenizer;
 use crate::typechecker::TypeChecker;
+use crate::interpreter::Interpreter;
 use std::io::{self, Write};
 
 pub struct Repl {
-    // TODO: Add fields for maintaining REPL state
-    // - History of commands
-    // - Current environment/scope
-    // - Configuration options
+    /// REPL version
     version: &'static str,
+    /// Interpreter instance that maintains state across evaluations
+    interpreter: Interpreter,
 }
 
 impl Repl {
     pub fn new() -> Self {
         Self {
             version: env!("CARGO_PKG_VERSION"),
+            interpreter: Interpreter::new(),
         }
     }
 
@@ -135,12 +136,16 @@ impl Repl {
 
         // Step 3: Type check the AST
         let mut type_checker = TypeChecker::new();
-        let typed_program = type_checker
+        let _typed_program = type_checker
             .check_program(&program)
             .map_err(|e| e.to_string())?;
 
-        // For now, show the typed AST
-        Ok(format!("Typed AST: {:#?}", typed_program))
+        // Step 4: Execute the program with the interpreter
+        let result = self.interpreter
+            .interpret_program(&program)
+            .map_err(|e| e.to_string())?;
+
+        Ok(format!("{}", result))
     }
 
     fn process_line(&mut self, input: &str) -> Result<String, String> {
