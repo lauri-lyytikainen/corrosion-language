@@ -254,4 +254,99 @@ mod tests {
             _ => panic!("Expected expression statement"),
         }
     }
+
+    #[test]
+    fn test_parse_empty_list() {
+        let tokens = vec![
+            create_token_with_span(Token::LeftBracket),
+            create_token_with_span(Token::RightBracket),
+            create_token_with_span(Token::Semicolon),
+            create_token_with_span(Token::Eof),
+        ];
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.statements.len(), 1);
+        match &program.statements[0] {
+            Statement::Expression { expression, .. } => match expression {
+                Expression::List { elements, .. } => {
+                    assert_eq!(elements.len(), 0);
+                }
+                _ => panic!("Expected list expression, got {:?}", expression),
+            },
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_list_with_elements() {
+        let tokens = vec![
+            create_token_with_span(Token::LeftBracket),
+            create_token_with_span(Token::Number(1)),
+            create_token_with_span(Token::Comma),
+            create_token_with_span(Token::Number(2)),
+            create_token_with_span(Token::Comma),
+            create_token_with_span(Token::Number(3)),
+            create_token_with_span(Token::RightBracket),
+            create_token_with_span(Token::Semicolon),
+            create_token_with_span(Token::Eof),
+        ];
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.statements.len(), 1);
+        match &program.statements[0] {
+            Statement::Expression { expression, .. } => match expression {
+                Expression::List { elements, .. } => {
+                    assert_eq!(elements.len(), 3);
+                    match &elements[0] {
+                        Expression::Number { value: 1, .. } => (),
+                        _ => panic!("Expected first element to be 1"),
+                    }
+                    match &elements[1] {
+                        Expression::Number { value: 2, .. } => (),
+                        _ => panic!("Expected second element to be 2"),
+                    }
+                    match &elements[2] {
+                        Expression::Number { value: 3, .. } => (),
+                        _ => panic!("Expected third element to be 3"),
+                    }
+                }
+                _ => panic!("Expected list expression, got {:?}", expression),
+            },
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_list_with_trailing_comma() {
+        let tokens = vec![
+            create_token_with_span(Token::LeftBracket),
+            create_token_with_span(Token::Number(42)),
+            create_token_with_span(Token::Comma),
+            create_token_with_span(Token::RightBracket),
+            create_token_with_span(Token::Semicolon),
+            create_token_with_span(Token::Eof),
+        ];
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.statements.len(), 1);
+        match &program.statements[0] {
+            Statement::Expression { expression, .. } => match expression {
+                Expression::List { elements, .. } => {
+                    assert_eq!(elements.len(), 1);
+                    match &elements[0] {
+                        Expression::Number { value: 42, .. } => (),
+                        _ => panic!("Expected element to be 42"),
+                    }
+                }
+                _ => panic!("Expected list expression, got {:?}", expression),
+            },
+            _ => panic!("Expected expression statement"),
+        }
+    }
 }

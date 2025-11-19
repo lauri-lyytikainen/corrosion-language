@@ -1046,4 +1046,123 @@ mod tests {
         assert_eq!(format!("{}", Type::Unknown), "unknown");
         assert_eq!(format!("{}", Type::Error), "error");
     }
+
+    #[test]
+    fn test_list_expression_type_checking() {
+        let mut checker = TypeChecker::new();
+
+        // Test empty list
+        let empty_list = Expression::List {
+            elements: vec![],
+            span: create_test_span(),
+        };
+        let result = checker.check_expression(&empty_list).unwrap();
+        match result.ty {
+            Type::List { element } => {
+                assert_eq!(*element, Type::Unknown);
+            }
+            _ => panic!("Expected list type, got {:?}", result.ty),
+        }
+
+        // Test homogeneous list
+        let int_list = Expression::List {
+            elements: vec![
+                Expression::Number {
+                    value: 1,
+                    span: create_test_span(),
+                },
+                Expression::Number {
+                    value: 2,
+                    span: create_test_span(),
+                },
+                Expression::Number {
+                    value: 3,
+                    span: create_test_span(),
+                },
+            ],
+            span: create_test_span(),
+        };
+        let result = checker.check_expression(&int_list).unwrap();
+        match result.ty {
+            Type::List { element } => {
+                assert_eq!(*element, Type::Int);
+            }
+            _ => panic!("Expected list type, got {:?}", result.ty),
+        }
+
+        // Test heterogeneous list (should cause type error)
+        let mixed_list = Expression::List {
+            elements: vec![
+                Expression::Number {
+                    value: 1,
+                    span: create_test_span(),
+                },
+                Expression::Boolean {
+                    value: true,
+                    span: create_test_span(),
+                },
+            ],
+            span: create_test_span(),
+        };
+        let result = checker.check_expression(&mixed_list);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            TypeError::TypeMismatch {
+                expected, found, ..
+            } => {
+                assert_eq!(expected, Type::Int);
+                assert_eq!(found, Type::Bool);
+            }
+            _ => panic!("Expected type mismatch error"),
+        }
+    }
+
+    #[test]
+    fn test_empty_list_with_type_annotation() {
+        use crate::ast::nodes::{Program, Statement, TypeExpression};
+
+        let mut checker = TypeChecker::new();
+
+        // Test empty list with Bool type annotation: let a: List Bool = [];
+        let empty_list = Expression::List {
+            elements: vec![],
+            span: create_test_span(),
+        };
+
+        let bool_list_type = TypeExpression::List {
+            element: Box::new(TypeExpression::Bool {
+                span: create_test_span(),
+            }),
+            span: create_test_span(),
+        };
+
+        let statement = Statement::VariableDeclaration {
+            name: "a".to_string(),
+            type_annotation: Some(bool_list_type),
+            value: empty_list,
+            span: create_test_span(),
+        };
+
+        let program = Program::new(vec![statement], create_test_span());
+
+        let result = checker.check_program(&program);
+        assert!(
+            result.is_ok(),
+            "Empty list with type annotation should succeed: {:?}",
+            result
+        );
+
+        let typed_program = result.unwrap();
+        assert_eq!(typed_program.statements.len(), 1);
+
+        match &typed_program.statements[0] {
+            TypedStatement::VariableDeclaration { ty, .. } => match ty {
+                Type::List { element } => {
+                    assert_eq!(**element, Type::Bool, "Expected List Bool type");
+                }
+                _ => panic!("Expected List type, got {:?}", ty),
+            },
+            _ => panic!("Expected variable declaration"),
+        }
+    }
 }

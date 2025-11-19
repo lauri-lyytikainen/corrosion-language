@@ -236,8 +236,45 @@ impl TypeChecker {
             Expression::FunctionCall { .. } => {
                 Ok(TypedExpression::new(Type::Error, expression.span().clone()))
             }
-            Expression::List { .. } => {
-                Ok(TypedExpression::new(Type::Error, expression.span().clone()))
+            Expression::List { elements, span } => {
+                if elements.is_empty() {
+                    // Empty list - we can't infer the element type, so return a generic list type
+                    // In a more sophisticated system, we'd use type variables
+                    Ok(TypedExpression::new(
+                        Type::List {
+                            element: Box::new(Type::Unknown),
+                        },
+                        span.clone(),
+                    ))
+                } else {
+                    // Type check all elements and ensure they're the same type
+                    let typed_elements: Result<Vec<_>, _> = elements
+                        .iter()
+                        .map(|elem| self.check_expression(elem))
+                        .collect();
+                    let typed_elements = typed_elements?;
+
+                    // Get the type of the first element
+                    let element_type = &typed_elements[0].ty;
+
+                    // Check that all elements have the same type
+                    for (i, typed_elem) in typed_elements.iter().enumerate().skip(1) {
+                        if !typed_elem.ty.is_assignable_to(element_type) {
+                            return Err(TypeError::TypeMismatch {
+                                expected: element_type.clone(),
+                                found: typed_elem.ty.clone(),
+                                span: elements[i].span().clone(),
+                            });
+                        }
+                    }
+
+                    Ok(TypedExpression::new(
+                        Type::List {
+                            element: Box::new(element_type.clone()),
+                        },
+                        span.clone(),
+                    ))
+                }
             }
             Expression::Pair {
                 first,
@@ -353,7 +390,20 @@ impl TypeChecker {
                     result: refined_result,
                 })
             }
-            // For non-function types, return the inferred type as-is
+            // Handle list types with Unknown elements
+            (Type::List { element: inf_elem }, Type::List { element: ann_elem }) => {
+                // If inferred element is Unknown, use annotated element type
+                let refined_element = if matches!(**inf_elem, Type::Unknown) {
+                    ann_elem.clone()
+                } else {
+                    inf_elem.clone()
+                };
+
+                Ok(Type::List {
+                    element: refined_element,
+                })
+            }
+            // For non-function/non-list types, return the inferred type as-is
             _ => Ok(inferred.clone()),
         }
     }
@@ -375,6 +425,11 @@ impl TypeChecker {
                     result: r2,
                 },
             ) => self.types_compatible(p1, p2) && self.types_compatible(r1, r2),
+
+            // List types are compatible if their element types are compatible
+            (Type::List { element: e1 }, Type::List { element: e2 }) => {
+                self.types_compatible(e1, e2)
+            }
 
             // Otherwise, use structural equality
             _ => t1 == t2,

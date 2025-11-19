@@ -217,6 +217,7 @@ impl Parser {
             }
             Token::Fn => self.parse_function_expression(),
             Token::LeftParen => self.parse_parenthesized_or_pair_expression(),
+            Token::LeftBracket => self.parse_list_expression(),
             token => Err(ParseError::UnexpectedToken {
                 expected: "expression".to_string(),
                 found: token,
@@ -289,6 +290,50 @@ impl Parser {
             self.consume(Token::RightParen, "Expected ')'")?;
             Ok(first)
         }
+    }
+
+    fn parse_list_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+        let mut elements = Vec::new();
+
+        // Handle empty list
+        if self.peek().token == Token::RightBracket {
+            self.advance(); // consume ']'
+            let end_span = self.previous_span();
+            let span = Span::new(
+                start_span.start,
+                end_span.end,
+                start_span.line,
+                start_span.column,
+            );
+            return Ok(Expression::List { elements, span });
+        }
+
+        // Parse first element
+        elements.push(self.parse_expression()?);
+
+        // Parse remaining elements separated by commas
+        while self.peek().token == Token::Comma {
+            self.advance(); // consume ','
+
+            // Allow trailing comma before ']'
+            if self.peek().token == Token::RightBracket {
+                break;
+            }
+
+            elements.push(self.parse_expression()?);
+        }
+
+        self.consume(Token::RightBracket, "Expected ']' to close list")?;
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::List { elements, span })
     }
 
     fn parse_type_expression(&mut self) -> ParseResult<TypeExpression> {
