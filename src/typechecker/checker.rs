@@ -233,8 +233,36 @@ impl TypeChecker {
 
                 Ok(TypedExpression::new(function_type, span.clone()))
             }
-            Expression::FunctionCall { .. } => {
-                Ok(TypedExpression::new(Type::Error, expression.span().clone()))
+            Expression::FunctionCall {
+                function,
+                argument,
+                span,
+            } => {
+                let function_typed = self.check_expression(function)?;
+                let argument_typed = self.check_expression(argument)?;
+
+                match &function_typed.ty {
+                    Type::Function { param, result } => {
+                        // Check if argument type is compatible with parameter type
+                        if self.types_compatible(&argument_typed.ty, param) {
+                            Ok(TypedExpression::new((**result).clone(), span.clone()))
+                        } else {
+                            Err(TypeError::TypeMismatch {
+                                expected: (**param).clone(),
+                                found: argument_typed.ty.clone(),
+                                span: span.clone(),
+                            })
+                        }
+                    }
+                    _ => Err(TypeError::TypeMismatch {
+                        expected: Type::Function {
+                            param: Box::new(Type::Unknown),
+                            result: Box::new(Type::Unknown),
+                        },
+                        found: function_typed.ty.clone(),
+                        span: span.clone(),
+                    }),
+                }
             }
             Expression::List { elements, span } => {
                 if elements.is_empty() {
@@ -310,9 +338,9 @@ impl TypeChecker {
                         Ok(TypedExpression::new((**first).clone(), span.clone()))
                     }
                     _ => Err(TypeError::TypeMismatch {
-                        expected: Type::Pair { 
-                            first: Box::new(Type::Error), 
-                            second: Box::new(Type::Error) 
+                        expected: Type::Pair {
+                            first: Box::new(Type::Error),
+                            second: Box::new(Type::Error),
                         },
                         found: pair_typed.ty.clone(),
                         span: span.clone(),
@@ -326,9 +354,9 @@ impl TypeChecker {
                         Ok(TypedExpression::new((**second).clone(), span.clone()))
                     }
                     _ => Err(TypeError::TypeMismatch {
-                        expected: Type::Pair { 
-                            first: Box::new(Type::Error), 
-                            second: Box::new(Type::Error) 
+                        expected: Type::Pair {
+                            first: Box::new(Type::Error),
+                            second: Box::new(Type::Error),
                         },
                         found: pair_typed.ty.clone(),
                         span: span.clone(),
@@ -463,6 +491,18 @@ impl TypeChecker {
                 self.types_compatible(e1, e2)
             }
 
+            // Pair types are compatible if their first and second types are compatible
+            (
+                Type::Pair {
+                    first: f1,
+                    second: s1,
+                },
+                Type::Pair {
+                    first: f2,
+                    second: s2,
+                },
+            ) => self.types_compatible(f1, f2) && self.types_compatible(s1, s2),
+
             // Otherwise, use structural equality
             _ => t1 == t2,
         }
@@ -509,6 +549,22 @@ impl TypeChecker {
                 right,
                 ..
             } => {
+                // First check if parameter is used in pair operations in sub-expressions
+                let left_pair_usage = self.analyze_parameter_usage(param, left);
+                let right_pair_usage = self.analyze_parameter_usage(param, right);
+
+                // If we find pair usage, prioritize it
+                if let Some(ref pair_type) = left_pair_usage {
+                    if matches!(pair_type, Type::Pair { .. }) {
+                        return left_pair_usage;
+                    }
+                }
+                if let Some(ref pair_type) = right_pair_usage {
+                    if matches!(pair_type, Type::Pair { .. }) {
+                        return right_pair_usage;
+                    }
+                }
+
                 // Check if parameter is used in arithmetic operations
                 let left_uses_param = self.expression_uses_parameter(param, left);
                 let right_uses_param = self.expression_uses_parameter(param, right);
@@ -524,9 +580,8 @@ impl TypeChecker {
                         _ => None,
                     }
                 } else {
-                    // Recursively check sub-expressions
-                    self.analyze_parameter_usage(param, left)
-                        .or_else(|| self.analyze_parameter_usage(param, right))
+                    // Return any other inferred type
+                    left_pair_usage.or(right_pair_usage)
                 }
             }
             Expression::FunctionCall {
@@ -547,6 +602,28 @@ impl TypeChecker {
                 // Recursively check sub-expressions
                 self.analyze_parameter_usage(param, function)
                     .or_else(|| self.analyze_parameter_usage(param, argument))
+            }
+            Expression::FirstProjection { pair, .. } => {
+                // If parameter is used in fst(), infer it's a pair type
+                if self.expression_uses_parameter(param, pair) {
+                    Some(Type::Pair {
+                        first: Box::new(Type::Unknown),
+                        second: Box::new(Type::Unknown),
+                    })
+                } else {
+                    self.analyze_parameter_usage(param, pair)
+                }
+            }
+            Expression::SecondProjection { pair, .. } => {
+                // If parameter is used in snd(), infer it's a pair type
+                if self.expression_uses_parameter(param, pair) {
+                    Some(Type::Pair {
+                        first: Box::new(Type::Unknown),
+                        second: Box::new(Type::Unknown),
+                    })
+                } else {
+                    self.analyze_parameter_usage(param, pair)
+                }
             }
             Expression::Block {
                 statements,
@@ -584,6 +661,10 @@ impl TypeChecker {
             } => {
                 self.expression_uses_parameter(param, function)
                     || self.expression_uses_parameter(param, argument)
+            }
+            Expression::FirstProjection { pair, .. } => self.expression_uses_parameter(param, pair),
+            Expression::SecondProjection { pair, .. } => {
+                self.expression_uses_parameter(param, pair)
             }
             Expression::Block {
                 statements,

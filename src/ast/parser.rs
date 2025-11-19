@@ -25,7 +25,7 @@ impl std::fmt::Display for ParseError {
             } => {
                 write!(
                     f,
-                    "Unexpected token at line {}, column {}: expected {}, found {:?}",
+                    "Unexpected token at line {}, column {}: {}, found {:?}",
                     span.line, span.column, expected, found
                 )
             }
@@ -144,7 +144,7 @@ impl Parser {
     }
 
     fn parse_binary_expression(&mut self, min_precedence: u8) -> ParseResult<Expression> {
-        let mut left = self.parse_primary()?;
+        let mut left = self.parse_call_expression()?;
 
         while !self.is_at_end() {
             let token = &self.peek().token;
@@ -175,6 +175,31 @@ impl Parser {
         }
 
         Ok(left)
+    }
+
+    fn parse_call_expression(&mut self) -> ParseResult<Expression> {
+        let mut expr = self.parse_primary()?;
+
+        while !self.is_at_end() && self.peek().token == Token::LeftParen {
+            self.advance(); // consume '('
+            let argument = Box::new(self.parse_expression()?);
+            self.consume(Token::RightParen, "Expected ')' after function argument")?;
+
+            let span = Span::new(
+                expr.span().start,
+                self.previous_span().end,
+                expr.span().line,
+                expr.span().column,
+            );
+
+            expr = Expression::FunctionCall {
+                function: Box::new(expr),
+                argument,
+                span,
+            };
+        }
+
+        Ok(expr)
     }
 
     fn get_binary_operator(&self, token: &Token) -> Option<(u8, crate::ast::BinaryOperator)> {
@@ -492,11 +517,11 @@ impl Parser {
 
     fn parse_first_projection(&mut self) -> ParseResult<Expression> {
         let start_span = self.previous_span();
-        
+
         self.consume(Token::LeftParen, "Expected '(' after 'fst'")?;
         let pair = Box::new(self.parse_expression()?);
         self.consume(Token::RightParen, "Expected ')' after expression in fst")?;
-        
+
         let end_span = self.previous_span();
         let span = Span::new(
             start_span.start,
@@ -504,17 +529,17 @@ impl Parser {
             start_span.line,
             start_span.column,
         );
-        
+
         Ok(Expression::FirstProjection { pair, span })
     }
 
     fn parse_second_projection(&mut self) -> ParseResult<Expression> {
         let start_span = self.previous_span();
-        
+
         self.consume(Token::LeftParen, "Expected '(' after 'snd'")?;
         let pair = Box::new(self.parse_expression()?);
         self.consume(Token::RightParen, "Expected ')' after expression in snd")?;
-        
+
         let end_span = self.previous_span();
         let span = Span::new(
             start_span.start,
@@ -522,7 +547,7 @@ impl Parser {
             start_span.line,
             start_span.column,
         );
-        
+
         Ok(Expression::SecondProjection { pair, span })
     }
 }
