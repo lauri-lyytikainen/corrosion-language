@@ -142,6 +142,30 @@ impl Interpreter {
                     }
                 })
             }
+
+            Expression::FirstProjection { pair, span } => {
+                let pair_val = self.interpret_expression(pair)?;
+                match pair_val {
+                    Value::Pair(first, _) => Ok(*first),
+                    _ => Err(InterpreterError::TypeError {
+                        expected: "Pair".to_string(),
+                        found: pair_val.type_name().to_string(),
+                        span: span.clone(),
+                    }),
+                }
+            }
+
+            Expression::SecondProjection { pair, span } => {
+                let pair_val = self.interpret_expression(pair)?;
+                match pair_val {
+                    Value::Pair(_, second) => Ok(*second),
+                    _ => Err(InterpreterError::TypeError {
+                        expected: "Pair".to_string(),
+                        found: pair_val.type_name().to_string(),
+                        span: span.clone(),
+                    }),
+                }
+            }
         }
     }
 

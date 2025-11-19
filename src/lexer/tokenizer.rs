@@ -69,6 +69,8 @@ fn parse_identifier_or_keyword(input: &str) -> IResult<&str, Token> {
             "Rec" => Token::Rec,
             "fn" => Token::Fn,
             "fix" => Token::Fix,
+            "fst" => Token::Fst,
+            "snd" => Token::Snd,
             "inl" => Token::Inl,
             "inr" => Token::Inr,
             "true" => Token::True,

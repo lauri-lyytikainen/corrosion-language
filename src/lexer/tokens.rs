@@ -13,6 +13,10 @@ pub enum Token {
     Fn,  // fn
     Fix, // fix
 
+    // Pair destructuring keywords
+    Fst, // fst (first element)
+    Snd, // snd (second element)
+
     // Sum type constructors
     Inl, // inl (left injection)
     Inr, // inr (right injection)

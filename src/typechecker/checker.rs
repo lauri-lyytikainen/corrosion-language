@@ -303,6 +303,38 @@ impl TypeChecker {
             Expression::Block { .. } => {
                 Ok(TypedExpression::new(Type::Error, expression.span().clone()))
             }
+            Expression::FirstProjection { pair, span } => {
+                let pair_typed = self.check_expression(pair)?;
+                match &pair_typed.ty {
+                    Type::Pair { first, .. } => {
+                        Ok(TypedExpression::new((**first).clone(), span.clone()))
+                    }
+                    _ => Err(TypeError::TypeMismatch {
+                        expected: Type::Pair { 
+                            first: Box::new(Type::Error), 
+                            second: Box::new(Type::Error) 
+                        },
+                        found: pair_typed.ty.clone(),
+                        span: span.clone(),
+                    }),
+                }
+            }
+            Expression::SecondProjection { pair, span } => {
+                let pair_typed = self.check_expression(pair)?;
+                match &pair_typed.ty {
+                    Type::Pair { second, .. } => {
+                        Ok(TypedExpression::new((**second).clone(), span.clone()))
+                    }
+                    _ => Err(TypeError::TypeMismatch {
+                        expected: Type::Pair { 
+                            first: Box::new(Type::Error), 
+                            second: Box::new(Type::Error) 
+                        },
+                        found: pair_typed.ty.clone(),
+                        span: span.clone(),
+                    }),
+                }
+            }
         }
     }
 

@@ -431,4 +431,36 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn test_pair_destructuring_keywords() {
+        let tokens = tokenize_input("fst snd").unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Fst,
+                Token::Snd,
+                Token::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn test_pair_destructuring_syntax() {
+        let tokens = tokenize_input("fst(pair) snd(pair)").unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Fst,
+                Token::LeftParen,
+                Token::Identifier("pair".to_string()),
+                Token::RightParen,
+                Token::Snd,
+                Token::LeftParen,
+                Token::Identifier("pair".to_string()),
+                Token::RightParen,
+                Token::Eof
+            ]
+        );
+    }
 }

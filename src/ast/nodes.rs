@@ -95,7 +95,7 @@ pub enum Expression {
     },
     // Function expressions
     Function {
-        param: String,  // Parameter name
+        param: String, // Parameter name
         body: Box<Expression>,
         span: Span,
     },
@@ -133,6 +133,15 @@ pub enum Expression {
     Block {
         statements: Vec<Statement>,
         expression: Option<Box<Expression>>,
+        span: Span,
+    },
+    // Pair destructuring
+    FirstProjection {
+        pair: Box<Expression>,
+        span: Span,
+    },
+    SecondProjection {
+        pair: Box<Expression>,
         span: Span,
     },
 }
@@ -204,6 +213,8 @@ impl Spanned for Expression {
             Expression::RightInject { span, .. } => span,
             Expression::Fix { span, .. } => span,
             Expression::Block { span, .. } => span,
+            Expression::FirstProjection { span, .. } => span,
+            Expression::SecondProjection { span, .. } => span,
         }
     }
 }

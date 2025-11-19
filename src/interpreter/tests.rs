@@ -189,4 +189,68 @@ mod tests {
             _ => panic!("Expected DivisionByZero error"),
         }
     }
+
+    #[test]
+    fn test_pair_first_projection() {
+        let mut interpreter = Interpreter::new();
+        
+        // Create pair (42, true)
+        let pair = Expression::Pair {
+            first: Box::new(Expression::Number { value: 42, span: create_test_span() }),
+            second: Box::new(Expression::Boolean { value: true, span: create_test_span() }),
+            span: create_test_span(),
+        };
+        
+        // Test fst(pair)
+        let fst_expr = Expression::FirstProjection {
+            pair: Box::new(pair),
+            span: create_test_span(),
+        };
+        
+        let result = interpreter.interpret_expression(&fst_expr).unwrap();
+        assert_eq!(result, Value::Int(42));
+    }
+
+    #[test]
+    fn test_pair_second_projection() {
+        let mut interpreter = Interpreter::new();
+        
+        // Create pair (42, true)
+        let pair = Expression::Pair {
+            first: Box::new(Expression::Number { value: 42, span: create_test_span() }),
+            second: Box::new(Expression::Boolean { value: true, span: create_test_span() }),
+            span: create_test_span(),
+        };
+        
+        // Test snd(pair)
+        let snd_expr = Expression::SecondProjection {
+            pair: Box::new(pair),
+            span: create_test_span(),
+        };
+        
+        let result = interpreter.interpret_expression(&snd_expr).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn test_pair_projection_type_error() {
+        let mut interpreter = Interpreter::new();
+        
+        // Try to project from a non-pair (integer)
+        let fst_expr = Expression::FirstProjection {
+            pair: Box::new(Expression::Number { value: 42, span: create_test_span() }),
+            span: create_test_span(),
+        };
+        
+        let result = interpreter.interpret_expression(&fst_expr);
+        assert!(result.is_err());
+        
+        match result.unwrap_err() {
+            InterpreterError::TypeError { expected, found, .. } => {
+                assert_eq!(expected, "Pair");
+                assert_eq!(found, "Int");
+            }
+            _ => panic!("Expected TypeError"),
+        }
+    }
 }

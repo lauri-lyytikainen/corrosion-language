@@ -216,6 +216,8 @@ impl Parser {
                 Ok(Expression::Identifier { name, span })
             }
             Token::Fn => self.parse_function_expression(),
+            Token::Fst => self.parse_first_projection(),
+            Token::Snd => self.parse_second_projection(),
             Token::LeftParen => self.parse_parenthesized_or_pair_expression(),
             Token::LeftBracket => self.parse_list_expression(),
             token => Err(ParseError::UnexpectedToken {
@@ -486,5 +488,41 @@ impl Parser {
             // Fallback for empty spans
             Span::new(0, 0, 1, 1)
         }
+    }
+
+    fn parse_first_projection(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+        
+        self.consume(Token::LeftParen, "Expected '(' after 'fst'")?;
+        let pair = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after expression in fst")?;
+        
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+        
+        Ok(Expression::FirstProjection { pair, span })
+    }
+
+    fn parse_second_projection(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+        
+        self.consume(Token::LeftParen, "Expected '(' after 'snd'")?;
+        let pair = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after expression in snd")?;
+        
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+        
+        Ok(Expression::SecondProjection { pair, span })
     }
 }
