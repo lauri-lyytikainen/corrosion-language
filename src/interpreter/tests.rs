@@ -704,4 +704,59 @@ mod tests {
         let result = interpreter.interpret_expression(&print_list_expr).unwrap();
         assert_eq!(result, Value::Unit);
     }
+
+    #[test]
+    fn test_multiline_function_body() {
+        let mut interpreter = Interpreter::new();
+
+        // Create a function with a multiline body: fn(x) { print(x); x + 10 }
+        let multiline_func = Expression::Function {
+            param: "x".to_string(),
+            body: Box::new(Expression::Block {
+                statements: vec![
+                    Statement::Expression {
+                        expression: Expression::Print {
+                            value: Box::new(Expression::Identifier {
+                                name: "x".to_string(),
+                                span: create_test_span(),
+                            }),
+                            span: create_test_span(),
+                        },
+                        span: create_test_span(),
+                    },
+                ],
+                expression: Some(Box::new(Expression::BinaryOp {
+                    left: Box::new(Expression::Identifier {
+                        name: "x".to_string(),
+                        span: create_test_span(),
+                    }),
+                    operator: crate::ast::nodes::BinaryOperator::Add,
+                    right: Box::new(Expression::Number {
+                        value: 10,
+                        span: create_test_span(),
+                    }),
+                    span: create_test_span(),
+                })),
+                span: create_test_span(),
+            }),
+            span: create_test_span(),
+        };
+
+        // Verify the function can be created
+        let _func_value = interpreter.interpret_expression(&multiline_func).unwrap();
+        
+        // Call the function with argument 5
+        let call_expr = Expression::FunctionCall {
+            function: Box::new(multiline_func),
+            argument: Box::new(Expression::Number {
+                value: 5,
+                span: create_test_span(),
+            }),
+            span: create_test_span(),
+        };
+
+        let result = interpreter.interpret_expression(&call_expr).unwrap();
+        // Should return 15 (5 + 10) and print 5 as a side effect
+        assert_eq!(result, Value::Int(15));
+    }
 }

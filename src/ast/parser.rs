@@ -302,8 +302,8 @@ impl Parser {
         self.consume(Token::RightParen, "Expected ')' after parameter")?;
         self.consume(Token::LeftBrace, "Expected '{' to start function body")?;
 
-        // Parse the function body as an expression
-        let body = Box::new(self.parse_expression()?);
+        // Parse the function body as a block
+        let body = Box::new(self.parse_block()?);
 
         self.consume(Token::RightBrace, "Expected '}' to end function body")?;
 
@@ -316,6 +316,52 @@ impl Parser {
         );
 
         Ok(Expression::Function { param, body, span })
+    }
+
+    fn parse_block(&mut self) -> ParseResult<Expression> {
+        let start_span = self.current_span();
+        let mut statements = Vec::new();
+        let mut final_expression = None;
+
+        while !self.is_at_end() && self.peek().token != Token::RightBrace {
+            // Check if this looks like an expression statement without semicolon
+            // (which would be the final expression of the block)
+            let checkpoint = self.current;
+
+            // Try to parse as a statement first
+            if let Ok(stmt) = self.parse_statement() {
+                statements.push(stmt);
+            } else {
+                // Restore position and try parsing as final expression
+                self.current = checkpoint;
+
+                // Only parse as final expression if we're at the end of the block
+                let expr = self.parse_expression()?;
+                final_expression = Some(Box::new(expr));
+                break;
+            }
+        }
+
+        let end_span = if final_expression.is_some() {
+            final_expression.as_ref().unwrap().span().clone()
+        } else if let Some(last_stmt) = statements.last() {
+            last_stmt.span().clone()
+        } else {
+            start_span.clone()
+        };
+
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::Block {
+            statements,
+            expression: final_expression,
+            span,
+        })
     }
 
     fn parse_parenthesized_or_pair_expression(&mut self) -> ParseResult<Expression> {

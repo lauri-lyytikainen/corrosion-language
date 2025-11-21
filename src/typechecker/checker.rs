@@ -349,8 +349,28 @@ impl TypeChecker {
             Expression::Fix { .. } => {
                 Ok(TypedExpression::new(Type::Error, expression.span().clone()))
             }
-            Expression::Block { .. } => {
-                Ok(TypedExpression::new(Type::Error, expression.span().clone()))
+            Expression::Block {
+                statements,
+                expression,
+                span,
+            } => {
+                // Create a new type checker with a child environment for the block scope
+                let mut block_checker = TypeChecker {
+                    environment: Environment::with_parent(self.environment.clone()),
+                    errors: Vec::new(),
+                };
+
+                // Check all statements in the block
+                for stmt in statements {
+                    block_checker.check_statement(stmt)?;
+                }
+
+                // Return the type of the final expression, or Unit if none
+                if let Some(expr) = expression {
+                    block_checker.check_expression(expr)
+                } else {
+                    Ok(TypedExpression::new(Type::Unit, span.clone()))
+                }
             }
             Expression::FirstProjection { pair, span } => {
                 let pair_typed = self.check_expression(pair)?;
@@ -653,6 +673,30 @@ impl TypeChecker {
                 let left_uses_param = self.expression_uses_parameter(param, left);
                 let right_uses_param = self.expression_uses_parameter(param, right);
 
+                // Also check for list operations in arithmetic context
+                let left_list_usage = self.analyze_parameter_usage(param, left);
+                let right_list_usage = self.analyze_parameter_usage(param, right);
+
+                // If we find list usage in arithmetic context, return List<Int>
+                if matches!(
+                    operator,
+                    crate::ast::BinaryOperator::Add
+                        | crate::ast::BinaryOperator::Subtract
+                        | crate::ast::BinaryOperator::Multiply
+                        | crate::ast::BinaryOperator::Divide
+                ) {
+                    if let Some(Type::List { .. }) = left_list_usage {
+                        return Some(Type::List {
+                            element: Box::new(Type::Int),
+                        });
+                    }
+                    if let Some(Type::List { .. }) = right_list_usage {
+                        return Some(Type::List {
+                            element: Box::new(Type::Int),
+                        });
+                    }
+                }
+
                 if left_uses_param || right_uses_param {
                     match operator {
                         crate::ast::BinaryOperator::Add
@@ -709,6 +753,30 @@ impl TypeChecker {
                     self.analyze_parameter_usage(param, pair)
                 }
             }
+            Expression::HeadProjection { list, .. } => {
+                // If parameter is used in head(), infer it's a list type
+                if self.expression_uses_parameter(param, list) {
+                    // Try to infer element type from context
+                    // Default to Int for arithmetic contexts, Unknown otherwise
+                    Some(Type::List {
+                        element: Box::new(Type::Int),
+                    })
+                } else {
+                    self.analyze_parameter_usage(param, list)
+                }
+            }
+            Expression::TailProjection { list, .. } => {
+                // If parameter is used in tail(), infer it's a list type
+                if self.expression_uses_parameter(param, list) {
+                    // Try to infer element type from context
+                    // Default to Int for arithmetic contexts, Unknown otherwise
+                    Some(Type::List {
+                        element: Box::new(Type::Int),
+                    })
+                } else {
+                    self.analyze_parameter_usage(param, list)
+                }
+            }
             Expression::Block {
                 statements,
                 expression,
@@ -750,6 +818,8 @@ impl TypeChecker {
             Expression::SecondProjection { pair, .. } => {
                 self.expression_uses_parameter(param, pair)
             }
+            Expression::HeadProjection { list, .. } => self.expression_uses_parameter(param, list),
+            Expression::TailProjection { list, .. } => self.expression_uses_parameter(param, list),
             Expression::Block {
                 statements,
                 expression,
