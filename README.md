@@ -11,7 +11,7 @@ Corrosion was designed for the [Modern and Emerging Programming Languages](https
 - **Static Type System** - Compile-time type checking with intelligent type inference
 - **Functional Programming** - First-class functions, closures, and immutable data structures
 - **Recursion Support** - Fixed point operator (`fix`) enabling Y-combinator patterns
-- **Control Flow** - For loops with range iteration and collection processing
+- **Control Flow** - If/else expressions and for loops with range iteration and collection processing
 - **Interactive REPL** - Experiment with code in real-time
 - **Pattern Matching** - Destructure data with `fst`/`snd` for pairs and `head`/`tail` for lists
 - **Rich Comments** - Single-line (`//`) and multi-line (`/* */`) comment support
@@ -132,6 +132,7 @@ First-class functions with lexical scoping:
 - **Variables**: `let name = value;`
 - **Type Annotations**: `let x: Int = 42;`
 - **Function Calls**: `function(argument)`
+- **Conditionals**: `if condition { ... } else { ... }`
 - **For Loops**: `for item in collection { ... };`
 - **Range Iteration**: `for i in range(1, 10) { ... };`
 - **Recursion**: `fix(fn(self) { fn(x) { ... } })`

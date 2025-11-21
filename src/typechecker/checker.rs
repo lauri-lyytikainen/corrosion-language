@@ -593,6 +593,50 @@ impl TypeChecker {
                     span.clone(),
                 ))
             }
+            Expression::If {
+                condition,
+                then_branch,
+                else_branch,
+                span,
+            } => {
+                let condition_typed = self.check_expression(condition)?;
+                if condition_typed.ty != Type::Bool {
+                    return Err(TypeError::TypeMismatch {
+                        expected: Type::Bool,
+                        found: condition_typed.ty,
+                        span: condition.span().clone(),
+                    });
+                }
+
+                let then_typed = self.check_expression(then_branch)?;
+
+                if let Some(else_branch) = else_branch {
+                    let else_typed = self.check_expression(else_branch)?;
+                    // Check if types are compatible
+                    if !then_typed.ty.is_assignable_to(&else_typed.ty)
+                        && !else_typed.ty.is_assignable_to(&then_typed.ty)
+                    {
+                        return Err(TypeError::TypeMismatch {
+                            expected: then_typed.ty,
+                            found: else_typed.ty,
+                            span: else_branch.span().clone(),
+                        });
+                    }
+                    // Return the type of the branches
+                    Ok(TypedExpression::new(then_typed.ty, span.clone()))
+                } else {
+                    // If there is no else branch, the expression must return Unit
+                    // and the then branch must also be Unit
+                    if then_typed.ty != Type::Unit {
+                        return Err(TypeError::TypeMismatch {
+                            expected: Type::Unit,
+                            found: then_typed.ty,
+                            span: then_branch.span().clone(),
+                        });
+                    }
+                    Ok(TypedExpression::new(Type::Unit, span.clone()))
+                }
+            }
         }
     }
 

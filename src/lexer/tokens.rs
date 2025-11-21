@@ -25,7 +25,9 @@ pub enum Token {
     // Built-in functions
     Print, // print (output to console)
 
-    // Loop constructs
+    // Control flow
+    If,    // if
+    Else,  // else
     For,   // for (list iteration)
     In,    // in (for iteration keyword)
     Range, // range (numeric range generation)

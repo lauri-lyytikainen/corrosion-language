@@ -75,6 +75,8 @@ fn parse_identifier_or_keyword(input: &str) -> IResult<&str, Token> {
             "head" => Token::Head,
             "tail" => Token::Tail,
             "print" => Token::Print,
+            "if" => Token::If,
+            "else" => Token::Else,
             "for" => Token::For,
             "in" => Token::In,
             "range" => Token::Range,

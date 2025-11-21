@@ -168,6 +168,13 @@ pub enum Expression {
         value: Box<Expression>,
         span: Span,
     },
+    // Control flow
+    If {
+        condition: Box<Expression>,
+        then_branch: Box<Expression>,
+        else_branch: Option<Box<Expression>>,
+        span: Span,
+    },
     // Loop constructs
     For {
         variable: String,
@@ -270,6 +277,7 @@ impl Spanned for Expression {
             Expression::HeadProjection { span, .. } => span,
             Expression::TailProjection { span, .. } => span,
             Expression::Print { span, .. } => span,
+            Expression::If { span, .. } => span,
             Expression::For { span, .. } => span,
             Expression::Range { span, .. } => span,
         }

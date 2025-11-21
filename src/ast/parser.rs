@@ -274,6 +274,7 @@ impl Parser {
             Token::Head => self.parse_head_projection(),
             Token::Tail => self.parse_tail_projection(),
             Token::Print => self.parse_print_expression(),
+            Token::If => self.parse_if_expression(),
             Token::For => self.parse_for_expression(),
             Token::Range => self.parse_range_expression(),
             Token::Fix => self.parse_fix_expression(),
@@ -703,6 +704,44 @@ impl Parser {
         );
 
         Ok(Expression::Print { value, span })
+    }
+
+    fn parse_if_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        // Parse condition
+        let condition = Box::new(self.parse_expression()?);
+
+        // Parse then branch
+        self.consume(Token::LeftBrace, "Expected '{' after if condition")?;
+        let then_branch = Box::new(self.parse_block()?);
+        self.consume(Token::RightBrace, "Expected '}' after if block")?;
+
+        // Parse else branch (optional)
+        let else_branch = if self.peek().token == Token::Else {
+            self.advance(); // consume 'else'
+            self.consume(Token::LeftBrace, "Expected '{' after else")?;
+            let else_block = Box::new(self.parse_block()?);
+            self.consume(Token::RightBrace, "Expected '}' after else block")?;
+            Some(else_block)
+        } else {
+            None
+        };
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::If {
+            condition,
+            then_branch,
+            else_branch,
+            span,
+        })
     }
 
     fn parse_for_expression(&mut self) -> ParseResult<Expression> {

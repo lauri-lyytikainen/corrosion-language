@@ -49,6 +49,7 @@ Corrosion has the following reserved keywords:
 - `let` - Variable declaration
 - `fn` - Function definition
 - `fix` - Fixed point operator for recursion
+- `if`, `else` - Conditional expressions
 - `for`, `in` - Loop constructs
 - `range` - Range generation
 - `true`, `false` - Boolean literals
@@ -306,6 +307,104 @@ let inner_second = snd(second_pair);  // 4
 ```
 
 ## Control Flow
+
+### If Expressions
+
+Corrosion supports conditional execution with `if` expressions:
+
+#### Basic If Expression
+
+```rust
+if condition {
+    // code to execute if condition is true
+};
+```
+
+#### If-Else Expression
+
+```rust
+let result = if x > 10 {
+    "large"
+} else {
+    "small"
+};
+```
+
+#### If Expression Rules
+
+1. **Condition must be Bool**: The condition expression must evaluate to a boolean value:
+
+```rust
+if true {
+    print("Always executes");
+};
+
+let x = 5;
+if x > 0 {
+    print("Positive number");
+};
+```
+
+2. **Type consistency**: When used as expressions, both branches must return the same type:
+
+```rust
+// Valid - both branches return Int
+let value = if condition { 42 } else { 0 };
+
+// Invalid - mixed types
+// let bad = if condition { 42 } else { true };
+```
+
+3. **Unit type for statements**: If expressions without else must return Unit:
+
+```rust
+// Valid - statement form
+if condition {
+    print("Something");
+};
+
+// Invalid - expression form without else
+// let x = if condition { 42 };
+```
+
+#### Nested If Expressions
+
+```rust
+let grade = if score >= 90 {
+    "A"
+} else {
+    if score >= 80 {
+        "B"
+    } else {
+        if score >= 70 {
+            "C"
+        } else {
+            "F"
+        }
+    }
+};
+```
+
+#### Combining with Other Features
+
+```rust
+// If with function calls
+let numbers = [1, 2, 3, 4, 5];
+for num in numbers {
+    if num > 3 {
+        print(num);
+    };
+};
+
+// If in function bodies
+let abs = fn(x) {
+    if x >= 0 {
+        x
+    } else {
+        0 - x
+    }
+};
+```
 
 ### For Loops
 

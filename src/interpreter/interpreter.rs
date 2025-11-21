@@ -316,6 +316,30 @@ impl Interpreter {
                     }),
                 }
             }
+
+            Expression::If {
+                condition,
+                then_branch,
+                else_branch,
+                ..
+            } => {
+                let condition_val = self.interpret_expression(condition)?;
+                match condition_val {
+                    Value::Bool(true) => self.interpret_expression(then_branch),
+                    Value::Bool(false) => {
+                        if let Some(else_branch) = else_branch {
+                            self.interpret_expression(else_branch)
+                        } else {
+                            Ok(Value::Unit)
+                        }
+                    }
+                    _ => Err(InterpreterError::TypeError {
+                        expected: "Bool".to_string(),
+                        found: condition_val.type_name().to_string(),
+                        span: condition.span().clone(),
+                    }),
+                }
+            }
         }
     }
 
