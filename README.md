@@ -10,6 +10,8 @@ Corrosion was designed for the [Modern and Emerging Programming Languages](https
 
 - **Static Type System** - Compile-time type checking with intelligent type inference
 - **Functional Programming** - First-class functions, closures, and immutable data structures
+- **Recursion Support** - Fixed point operator (`fix`) enabling Y-combinator patterns
+- **Control Flow** - For loops with range iteration and collection processing
 - **Interactive REPL** - Experiment with code in real-time
 - **Pattern Matching** - Destructure data with `fst`/`snd` for pairs and `head`/`tail` for lists
 - **Rich Comments** - Single-line (`//`) and multi-line (`/* */`) comment support
@@ -46,13 +48,8 @@ Source Code -> Lexer -> Parser -> AST -> Type Checker -> Interpreter
 git clone https://github.com/lauri-lyytikainen/corrosion-language.git
 cd corrosion-language
 
-# Run the REPL in the development environment
-cargo run
-
 # Build the project
 cargo build --release
-
-
 ```
 
 ## Getting Started
@@ -63,6 +60,9 @@ Start the interactive environment to experiment with the language:
 
 ```bash
 cargo run
+
+# Or run the executable directly
+./target/release/corrosion-language
 ```
 
 The REPL allows you to:
@@ -79,6 +79,7 @@ Execute Corrosion programs from files:
 ```bash
 # Run a program file
 cargo run program.corr
+# or ./target/release/corrosion-language program.corr
 
 # View help in REPL
 help
@@ -131,6 +132,9 @@ First-class functions with lexical scoping:
 - **Variables**: `let name = value;`
 - **Type Annotations**: `let x: Int = 42;`
 - **Function Calls**: `function(argument)`
+- **For Loops**: `for item in collection { ... };`
+- **Range Iteration**: `for i in range(1, 10) { ... };`
+- **Recursion**: `fix(fn(self) { fn(x) { ... } })`
 - **Comments**: `// single line` and `/* multi-line */`
 - **Operators**: Arithmetic (`+`, `-`, `*`, `/`), comparison (`==`, `<`, etc.), logical (`&&`, `||`, `!`)
 

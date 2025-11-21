@@ -12,11 +12,13 @@ Welcome to the Corrosion programming language! This tutorial will guide you thro
 6. [Data Structures](#data-structures)
 7. [List Operations](#list-operations)
 8. [Pair Operations](#pair-operations)
-9. [Type System](#type-system)
-10. [Output](#output)
-11. [Comments](#comments)
-12. [Error Handling](#error-handling)
-13. [Advanced Topics](#advanced-topics)
+9. [Control Flow](#control-flow)
+10. [Recursion](#recursion)
+11. [Type System](#type-system)
+12. [Output](#output)
+13. [Comments](#comments)
+14. [Error Handling](#error-handling)
+15. [Advanced Topics](#advanced-topics)
 
 ## Getting Started
 
@@ -46,6 +48,9 @@ Corrosion has the following reserved keywords:
 
 - `let` - Variable declaration
 - `fn` - Function definition
+- `fix` - Fixed point operator for recursion
+- `for`, `in` - Loop constructs
+- `range` - Range generation
 - `true`, `false` - Boolean literals
 - `print` - Output statement
 - `cons`, `head`, `tail` - List operations
@@ -300,6 +305,205 @@ let second_pair = snd(nested);   // (3, 4)
 let inner_second = snd(second_pair);  // 4
 ```
 
+## Control Flow
+
+### For Loops
+
+Corrosion supports for loops for iterating over ranges and collections:
+
+#### Iterating Over Ranges
+
+```rust
+// Print numbers from 1 to 10
+for i in range(1, 11) {
+    print(i);
+};
+
+// Range is exclusive of the end value
+for x in range(0, 5) {
+    print(x);  // Prints: 0, 1, 2, 3, 4
+};
+```
+
+#### Iterating Over Lists
+
+```rust
+let numbers = [10, 20, 30, 40];
+for num in numbers {
+    print(num);  // Prints each number
+};
+
+let words = ["hello", "world"];
+for word in words {
+    print(word);
+};
+```
+
+#### Loop Body
+
+The loop body can contain any valid statements:
+
+```rust
+let base = 5;
+for i in range(1, 4) {
+    let result = base * i;
+    print(result);  // Prints: 5, 10, 15
+};
+```
+
+#### Nested Loops
+
+```rust
+for i in range(1, 4) {
+    for j in range(1, 3) {
+        print((i, j));  // Prints pairs: (1,1), (1,2), (2,1), (2,2), (3,1), (3,2)
+    };
+};
+```
+
+### Range Function
+
+The `range` function creates a sequence of integers:
+
+```rust
+// range(start, end) - generates numbers from start to end-1
+let r1 = range(0, 5);   // [0, 1, 2, 3, 4]
+let r2 = range(10, 13); // [10, 11, 12]
+let r3 = range(5, 5);   // [] (empty range)
+```
+
+**Note**: The `range` function is exclusive of the end value, meaning `range(1, 4)` produces `[1, 2, 3]`.
+
+## Recursion
+
+### Fixed Point Operator
+
+Corrosion supports recursion through the fixed point operator (`fix`), which implements the Y-combinator pattern:
+
+#### Basic Syntax
+
+```rust
+fix(fn(recursive_function) {
+    fn(argument) {
+        // function body that can call recursive_function
+    }
+})
+```
+
+#### Simple Examples
+
+```rust
+// Identity function using fix
+let identity = fix(fn(f) { fn(x) { x } });
+print(identity(42));  // Prints: 42
+
+// Function that adds 1
+let add_one = fix(fn(f) { fn(x) { x + 1 } });
+print(add_one(10));  // Prints: 11
+```
+
+#### Function Composition with Recursion
+
+```rust
+// Apply a function twice
+let apply_twice = fix(fn(self) {
+    fn(func) {
+        fn(value) {
+            func(func(value))
+        }
+    }
+});
+
+let double = fn(x) { x * 2 };
+let quadruple = apply_twice(double);
+print(quadruple(5));  // Prints: 20 (5 * 2 * 2)
+```
+
+#### Higher-Order Recursive Functions
+
+```rust
+// Create parameterized functions
+let make_adder = fix(fn(self) {
+    fn(n) {
+        fn(x) {
+            x + n
+        }
+    }
+});
+
+let add_10 = make_adder(10);
+print(add_10(5));  // Prints: 15
+```
+
+#### Mathematical Foundation
+
+The fixed point operator implements the Y-combinator:
+
+- `fix(f)` returns a value `x` such that `f(x) = x`
+- This enables recursive function definitions without explicit self-reference
+- The pattern `fix(fn(self) { ... })` allows the function to call itself via `self`
+
+#### Recursive Patterns
+
+While Corrosion doesn't yet have conditional expressions, you can build recursive structures:
+
+```rust
+// Simple recursive patterns work well
+let make_multiplier = fix(fn(self) {
+    fn(factor) {
+        fn(value) {
+            value * factor
+        }
+    }
+});
+
+let times_three = make_multiplier(3);
+print(times_three(10)); // Prints: 30
+```
+
+### Higher-Order Functions
+
+The type system fully supports higher-order functions - functions that take other functions as parameters:
+
+```rust
+// Apply a function twice
+let apply_twice = fn(f) { fn(x) { f(f(x)) } };
+
+let increment = fn(x) { x + 1 };
+print(apply_twice(increment)(5)); // Prints: 7
+
+// Function composition
+let compose = fn(f) { fn(g) { fn(x) { f(g(x)) } } };
+let add_two = fn(n) { n + 2 };
+print(compose(increment)(add_two)(10)); // Prints: 13
+```
+
+### Recursion vs Loops
+
+- **Loops** (`for`): Best for simple iteration over collections and ranges
+- **Recursion** (`fix`): Best for complex functional patterns and self-referential algorithms
+- **Performance**: Both are suitable for different use cases, loops are more direct for simple iteration
+
+### Combining Recursion and Loops
+
+```rust
+// Use loops for simple iteration, recursion for complex logic
+let process_ranges = fix(fn(self) {
+    fn(processor) {
+        fn(max_range) {
+            for i in range(1, max_range) {
+                let processed = processor(i);
+                print(processed);
+            };
+        }
+    }
+});
+
+let square = fn(x) { x * x };
+let square_printer = process_ranges(square);
+square_printer(5);  // Prints squares: 1, 4, 9, 16
+```
+
 ## Type System
 
 ### Basic Types
@@ -470,32 +674,94 @@ let tree = (1, (leaf, leaf));  // Node with value 1 and no children
 
 ### Functional Programming Patterns
 
-#### Map-like Operations (Conceptual)
-
-While Corrosion doesn't have built-in `map`, you can build similar functionality:
+#### Map-like Operations with Loops
 
 ```rust
-// Apply a function to each element (conceptually)
-let transform_list = fn(f) {
+// Transform each element in a list using loops
+let transform_with_loop = fn(f) {
     fn(list) {
-        // Would recursively apply f to each element
-        list
+        // Process each element
+        for item in list {
+            let transformed = f(item);
+            print(transformed);
+        };
     }
 };
+
+let double = fn(x) { x * 2 };
+let doubler = transform_with_loop(double);
+doubler([1, 2, 3]);  // Prints: 2, 4, 6
 ```
 
-#### Fold-like Operations (Conceptual)
+#### Recursive Functional Patterns
 
 ```rust
-// Reduce a list to a single value (conceptually)
-let fold_list = fn(f) {
-    fn(initial) {
+// Apply a function to each element using recursion
+let recursive_map = fix(fn(self) {
+    fn(func) {
         fn(list) {
-            // Would recursively apply f to accumulate result
-            initial
+            // Base case would check if list is empty
+            // Recursive case would process head and recurse on tail
+            // (More powerful with conditional expressions)
+            list
         }
     }
-};
+});
+
+// Fold-like operations with fixed point
+let recursive_fold = fix(fn(self) {
+    fn(combiner) {
+        fn(initial) {
+            fn(list) {
+                // Would recursively combine elements
+                initial
+            }
+        }
+    }
+});
+```
+
+#### Combining Loops and Recursion
+
+```rust
+// Use recursion to build higher-order loop patterns
+let repeat_n_times = fix(fn(self) {
+    fn(n) {
+        fn(action) {
+            for i in range(0, n) {
+                action(i);
+            };
+        }
+    }
+});
+
+let print_number = fn(x) { print(x); };
+let print_5_times = repeat_n_times(5);
+print_5_times(print_number);  // Prints: 0, 1, 2, 3, 4
+```
+
+#### Advanced Control Flow Patterns
+
+```rust
+// Nested iteration with recursion
+let matrix_processor = fix(fn(self) {
+    fn(processor) {
+        fn(rows) {
+            fn(cols) {
+                for r in range(0, rows) {
+                    for c in range(0, cols) {
+                        let result = processor((r, c));
+                        print(result);
+                    };
+                };
+            }
+        }
+    }
+});
+
+let coordinate_sum = fn(coord) { fst(coord) + snd(coord) };
+let process_3x3 = matrix_processor(coordinate_sum);
+process_3x3(3)(3);  // Prints coordinate sums for 3x3 grid
 ```
 
 ### Working with Complex Data
@@ -572,7 +838,17 @@ Corrosion is a functional programming language with:
 - **Static typing** with type inference
 - **Immutable data structures** (lists, pairs)
 - **First-class functions** with closures
+- **Recursion support** via fixed point operator
+- **Control flow** with for loops and range iteration
 - **Pattern matching** through destructuring operations
 - **Interactive development** via REPL
 
-The language encourages functional programming practices while providing safety through its type system. Happy coding!
+The language combines functional programming principles with practical control flow constructs, enabling both elegant recursive algorithms and efficient iterative processing. The fixed point operator allows for sophisticated recursive patterns, while for loops provide straightforward iteration over collections and ranges.
+
+Key features for different programming styles:
+
+- **Functional**: Use `fix` for recursion, higher-order functions, and function composition
+- **Iterative**: Use `for` loops with `range` for processing sequences
+- **Hybrid**: Combine both approaches for complex data processing patterns
+
+The type system ensures safety across all these paradigms. Happy coding!

@@ -5,6 +5,9 @@ pub mod value;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod fix_tests;
+
 pub use environment::Environment;
 pub use interpreter::Interpreter;
 pub use value::Value;

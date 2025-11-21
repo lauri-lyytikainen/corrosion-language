@@ -168,6 +168,18 @@ pub enum Expression {
         value: Box<Expression>,
         span: Span,
     },
+    // Loop constructs
+    For {
+        variable: String,
+        iterable: Box<Expression>,
+        body: Box<Expression>,
+        span: Span,
+    },
+    Range {
+        start: Box<Expression>,
+        end: Box<Expression>,
+        span: Span,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -258,6 +270,8 @@ impl Spanned for Expression {
             Expression::HeadProjection { span, .. } => span,
             Expression::TailProjection { span, .. } => span,
             Expression::Print { span, .. } => span,
+            Expression::For { span, .. } => span,
+            Expression::Range { span, .. } => span,
         }
     }
 }

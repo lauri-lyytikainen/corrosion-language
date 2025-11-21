@@ -25,6 +25,11 @@ pub enum Token {
     // Built-in functions
     Print, // print (output to console)
 
+    // Loop constructs
+    For,   // for (list iteration)
+    In,    // in (for iteration keyword)
+    Range, // range (numeric range generation)
+
     // Sum type constructors
     Inl, // inl (left injection)
     Inr, // inr (right injection)

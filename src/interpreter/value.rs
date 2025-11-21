@@ -21,6 +21,8 @@ pub enum Value {
     LeftInject(Box<Value>),
     /// Right injection of sum type
     RightInject(Box<Value>),
+    /// Fixed point value for recursive functions
+    FixedPoint { function: Box<Value> },
 }
 
 impl Value {
@@ -35,6 +37,7 @@ impl Value {
             Value::Function { .. } => "Function",
             Value::LeftInject(_) => "LeftInject",
             Value::RightInject(_) => "RightInject",
+            Value::FixedPoint { .. } => "FixedPoint",
         }
     }
 
@@ -45,7 +48,8 @@ impl Value {
             Value::Unit => false,
             Value::Int(n) => *n != 0,
             Value::List(list) => !list.is_empty(),
-            _ => true, // Other values are considered truthy
+            Value::FixedPoint { .. } => true, // Fixed point functions are truthy
+            _ => true,                        // Other values are considered truthy
         }
     }
 
@@ -93,6 +97,9 @@ impl std::fmt::Display for Value {
             }
             Value::RightInject(value) => {
                 write!(f, "Right({})", value)
+            }
+            Value::FixedPoint { .. } => {
+                write!(f, "<recursive function>")
             }
         }
     }

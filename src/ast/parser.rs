@@ -274,6 +274,9 @@ impl Parser {
             Token::Head => self.parse_head_projection(),
             Token::Tail => self.parse_tail_projection(),
             Token::Print => self.parse_print_expression(),
+            Token::For => self.parse_for_expression(),
+            Token::Range => self.parse_range_expression(),
+            Token::Fix => self.parse_fix_expression(),
             Token::LeftParen => self.parse_parenthesized_or_pair_expression(),
             Token::LeftBracket => self.parse_list_expression(),
             token => Err(ParseError::UnexpectedToken {
@@ -700,5 +703,79 @@ impl Parser {
         );
 
         Ok(Expression::Print { value, span })
+    }
+
+    fn parse_for_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        // Parse: for variable in iterable { body }
+        let variable = if let Token::Identifier(name) = &self.advance().token {
+            name.clone()
+        } else {
+            return Err(ParseError::UnexpectedToken {
+                expected: "variable name".to_string(),
+                found: self.previous().token.clone(),
+                span: self.previous_span(),
+            });
+        };
+
+        self.consume(Token::In, "Expected 'in' after for variable")?;
+        let iterable = Box::new(self.parse_expression()?);
+        self.consume(Token::LeftBrace, "Expected '{' to start for body")?;
+        let body = Box::new(self.parse_block()?);
+        self.consume(Token::RightBrace, "Expected '}' to end for body")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::For {
+            variable,
+            iterable,
+            body,
+            span,
+        })
+    }
+
+    fn parse_range_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        self.consume(Token::LeftParen, "Expected '(' after 'range'")?;
+        let start = Box::new(self.parse_expression()?);
+        self.consume(Token::Comma, "Expected ',' in range")?;
+        let end = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after range end")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::Range { start, end, span })
+    }
+
+    fn parse_fix_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        self.consume(Token::LeftParen, "Expected '(' after 'fix'")?;
+        let function = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after fix function")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::Fix { function, span })
     }
 }

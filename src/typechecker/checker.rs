@@ -264,16 +264,26 @@ impl TypeChecker {
 
                 match &function_typed.ty {
                     Type::Function { param, result } => {
+                        // Enhanced type checking with Unknown type handling
+                        let refined_param =
+                            self.refine_type_with_context(param, &argument_typed.ty);
+                        let refined_result = self.refine_type_with_context(result, &Type::Unknown);
+
                         // Check if argument type is compatible with parameter type
-                        if self.types_compatible(&argument_typed.ty, param) {
-                            Ok(TypedExpression::new((**result).clone(), span.clone()))
+                        if self.types_compatible(&argument_typed.ty, &refined_param) {
+                            Ok(TypedExpression::new(refined_result, span.clone()))
                         } else {
                             Err(TypeError::TypeMismatch {
-                                expected: (**param).clone(),
+                                expected: refined_param,
                                 found: argument_typed.ty.clone(),
                                 span: span.clone(),
                             })
                         }
+                    }
+                    Type::Unknown => {
+                        // If function type is unknown, try to infer it from context
+                        // Assume it's a function and return Unknown result
+                        Ok(TypedExpression::new(Type::Unknown, span.clone()))
                     }
                     _ => Err(TypeError::TypeMismatch {
                         expected: Type::Function {
@@ -346,8 +356,63 @@ impl TypeChecker {
             Expression::RightInject { .. } => {
                 Ok(TypedExpression::new(Type::Error, expression.span().clone()))
             }
-            Expression::Fix { .. } => {
-                Ok(TypedExpression::new(Type::Error, expression.span().clone()))
+            Expression::Fix { function, span } => {
+                // Type check the function expression
+                let func_typed = self.check_expression(function)?;
+
+                // The function should have type (T -> T) -> T for some T
+                // Where T is typically a function type for recursive functions
+                match &func_typed.ty {
+                    Type::Function { param, result } => {
+                        // For fix(f), where f : (T -> T) -> (T -> T)
+                        // The result should be of type T -> T
+                        match (param.as_ref(), result.as_ref()) {
+                            (
+                                Type::Function {
+                                    param: inner_param,
+                                    result: inner_result,
+                                },
+                                Type::Function {
+                                    param: outer_param,
+                                    result: outer_result,
+                                },
+                            ) => {
+                                // Verify that inner_param == inner_result and outer_param == outer_result
+                                if inner_param == inner_result
+                                    && outer_param == outer_result
+                                    && inner_param == outer_param
+                                {
+                                    // Return the fixed point type T -> T
+                                    Ok(TypedExpression::new(
+                                        Type::Function {
+                                            param: inner_param.clone(),
+                                            result: inner_result.clone(),
+                                        },
+                                        span.clone(),
+                                    ))
+                                } else {
+                                    // For now, allow any function type and return the result type
+                                    Ok(TypedExpression::new(result.as_ref().clone(), span.clone()))
+                                }
+                            }
+                            _ => {
+                                // For simpler cases, just return the result type of the function
+                                Ok(TypedExpression::new(result.as_ref().clone(), span.clone()))
+                            }
+                        }
+                    }
+                    _ => {
+                        self.errors.push(TypeError::TypeMismatch {
+                            expected: Type::Function {
+                                param: Box::new(Type::Unknown),
+                                result: Box::new(Type::Unknown),
+                            },
+                            found: func_typed.ty.clone(),
+                            span: span.clone(),
+                        });
+                        Ok(TypedExpression::new(Type::Error, span.clone()))
+                    }
+                }
             }
             Expression::Block {
                 statements,
@@ -467,6 +532,67 @@ impl TypeChecker {
                 // Print always returns Unit type
                 Ok(TypedExpression::new(Type::Unit, span.clone()))
             }
+            Expression::For {
+                variable,
+                iterable,
+                body,
+                span,
+            } => {
+                let iterable_typed = self.check_expression(iterable)?;
+
+                // Ensure iterable is a list
+                let element_type = match &iterable_typed.ty {
+                    Type::List { element } => element.as_ref().clone(),
+                    _ => {
+                        return Err(TypeError::TypeMismatch {
+                            expected: Type::List {
+                                element: Box::new(Type::Unknown),
+                            },
+                            found: iterable_typed.ty.clone(),
+                            span: span.clone(),
+                        });
+                    }
+                };
+
+                // Type check the body in a new scope with the loop variable bound
+                let mut for_checker = TypeChecker {
+                    environment: Environment::with_parent(self.environment.clone()),
+                    errors: Vec::new(),
+                };
+                for_checker.environment.bind(variable.clone(), element_type);
+                let _ = for_checker.check_expression(body)?;
+
+                // For loops return Unit
+                Ok(TypedExpression::new(Type::Unit, span.clone()))
+            }
+            Expression::Range { start, end, span } => {
+                let start_typed = self.check_expression(start)?;
+                let end_typed = self.check_expression(end)?;
+
+                // Both start and end must be integers
+                if start_typed.ty != Type::Int {
+                    return Err(TypeError::TypeMismatch {
+                        expected: Type::Int,
+                        found: start_typed.ty,
+                        span: span.clone(),
+                    });
+                }
+                if end_typed.ty != Type::Int {
+                    return Err(TypeError::TypeMismatch {
+                        expected: Type::Int,
+                        found: end_typed.ty,
+                        span: span.clone(),
+                    });
+                }
+
+                // Range returns a list of integers
+                Ok(TypedExpression::new(
+                    Type::List {
+                        element: Box::new(Type::Int),
+                    },
+                    span.clone(),
+                ))
+            }
         }
     }
 
@@ -573,6 +699,20 @@ impl TypeChecker {
     }
 
     /// Check if two types are compatible
+    /// Refine a type by replacing Unknown with more specific types based on context
+    fn refine_type_with_context(&self, original: &Type, context: &Type) -> Type {
+        match (original, context) {
+            (Type::Unknown, concrete_type) if !matches!(concrete_type, Type::Unknown) => {
+                concrete_type.clone()
+            }
+            (Type::Function { param, result }, _) => Type::Function {
+                param: Box::new(self.refine_type_with_context(param, &Type::Unknown)),
+                result: Box::new(self.refine_type_with_context(result, &Type::Unknown)),
+            },
+            _ => original.clone(),
+        }
+    }
+
     fn types_compatible(&self, t1: &Type, t2: &Type) -> bool {
         match (t1, t2) {
             // Unknown types are compatible with anything
@@ -629,14 +769,138 @@ impl TypeChecker {
 
     /// Infer the parameter type based on how it's used in the function body
     fn infer_parameter_type(&mut self, param: &str, body: &Expression) -> TypeResult<Type> {
-        // Simple type inference based on usage patterns
-        match self.analyze_parameter_usage(param, body) {
-            Some(inferred_type) => Ok(inferred_type),
-            None => {
-                // If we can't infer the type from usage, default to Unknown
-                // In a more sophisticated system, we might require type annotations
-                Ok(Type::Unknown)
+        // Enhanced type inference for function parameters
+
+        // First, try to analyze direct usage patterns
+        if let Some(inferred_type) = self.analyze_parameter_usage(param, body) {
+            return Ok(inferred_type);
+        }
+
+        // Check if parameter is used in function call contexts
+        if let Some(func_type) = self.analyze_function_usage(param, body) {
+            return Ok(func_type);
+        }
+
+        // Check if parameter appears to be a function based on call patterns
+        if self.parameter_used_as_function(param, body) {
+            // Create a generic function type - this will be refined later
+            return Ok(Type::Function {
+                param: Box::new(Type::Unknown),
+                result: Box::new(Type::Unknown),
+            });
+        }
+
+        // If we can't infer the type from usage, start with Unknown
+        // but try to refine it through constraint solving
+        Ok(Type::Unknown)
+    }
+
+    /// Check if a parameter is used in function call contexts
+    fn analyze_function_usage(&self, param: &str, expr: &Expression) -> Option<Type> {
+        match expr {
+            Expression::FunctionCall {
+                function, argument, ..
+            } => {
+                if let Expression::Identifier { name, .. } = function.as_ref() {
+                    if name == param {
+                        // Parameter is called as a function
+                        // Try to infer the argument type
+                        let arg_type = self.get_expression_type_hint(argument);
+                        return Some(Type::Function {
+                            param: Box::new(arg_type),
+                            result: Box::new(Type::Unknown),
+                        });
+                    }
+                }
+                // Recursively check sub-expressions
+                if let Some(func_type) = self.analyze_function_usage(param, function) {
+                    return Some(func_type);
+                }
+                if let Some(func_type) = self.analyze_function_usage(param, argument) {
+                    return Some(func_type);
+                }
             }
+            Expression::Function { body, .. } => {
+                return self.analyze_function_usage(param, body);
+            }
+            Expression::Block {
+                statements,
+                expression,
+                ..
+            } => {
+                for stmt in statements {
+                    if let Statement::Expression {
+                        expression: expr, ..
+                    } = stmt
+                    {
+                        if let Some(func_type) = self.analyze_function_usage(param, expr) {
+                            return Some(func_type);
+                        }
+                    }
+                }
+                if let Some(expr) = expression {
+                    return self.analyze_function_usage(param, expr);
+                }
+            }
+            _ => {}
+        }
+        None
+    }
+
+    /// Check if a parameter is used as a function (called with arguments)
+    fn parameter_used_as_function(&self, param: &str, expr: &Expression) -> bool {
+        match expr {
+            Expression::FunctionCall { function, .. } => {
+                if let Expression::Identifier { name, .. } = function.as_ref() {
+                    if name == param {
+                        return true;
+                    }
+                }
+                false
+            }
+            Expression::Function { body, .. } => self.parameter_used_as_function(param, body),
+            Expression::Block {
+                statements,
+                expression,
+                ..
+            } => {
+                for stmt in statements {
+                    if let Statement::Expression {
+                        expression: expr, ..
+                    } = stmt
+                    {
+                        if self.parameter_used_as_function(param, expr) {
+                            return true;
+                        }
+                    }
+                }
+                if let Some(expr) = expression {
+                    return self.parameter_used_as_function(param, expr);
+                }
+                false
+            }
+            _ => false,
+        }
+    }
+
+    /// Get a type hint for an expression without full type checking
+    fn get_expression_type_hint(&self, expr: &Expression) -> Type {
+        match expr {
+            Expression::Number { .. } => Type::Int,
+            Expression::Boolean { .. } => Type::Bool,
+            Expression::Identifier { name, .. } => {
+                // Try to look up in current environment
+                if let Some(ty) = self.environment.lookup(name) {
+                    ty.clone()
+                } else {
+                    Type::Unknown
+                }
+            }
+            Expression::Function { .. } => Type::Function {
+                param: Box::new(Type::Unknown),
+                result: Box::new(Type::Unknown),
+            },
+            _ => Type::Unknown,
         }
     }
 

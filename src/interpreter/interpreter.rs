@@ -1,5 +1,5 @@
 use super::{Environment, InterpreterError, InterpreterResult, Value};
-use crate::ast::nodes::{BinaryOperator, Expression, Program, Statement};
+use crate::ast::nodes::{BinaryOperator, Expression, Program, Spanned, Statement};
 use crate::lexer::tokens::Span;
 
 /// Interpreter for the Corrosion language
@@ -122,12 +122,23 @@ impl Interpreter {
                 Ok(Value::RightInject(val))
             }
 
-            Expression::Fix { function: _, span } => {
-                // For now, return an error - fixpoint requires more complex handling
-                Err(InterpreterError::RuntimeError {
-                    message: "Fixpoint expressions not yet implemented".to_string(),
-                    span: Some(span.clone()),
-                })
+            Expression::Fix { function, span } => {
+                // Implement the Y-combinator style fixed point operator
+                // fix(f) = f(fix(f)) - but we need to delay evaluation to avoid infinite recursion
+                let func_value = self.interpret_expression(function)?;
+
+                match func_value {
+                    Value::Function { param, body, env } => {
+                        // Create a FixedPoint value that represents the recursive function
+                        Ok(Value::FixedPoint {
+                            function: Box::new(Value::Function { param, body, env }),
+                        })
+                    }
+                    _ => Err(InterpreterError::RuntimeError {
+                        message: "Fix can only be applied to functions".to_string(),
+                        span: Some(span.clone()),
+                    }),
+                }
             }
 
             Expression::Block {
@@ -242,6 +253,68 @@ impl Interpreter {
                 let val = self.interpret_expression(value)?;
                 println!("{}", val);
                 Ok(Value::Unit)
+            }
+
+            Expression::For {
+                variable,
+                iterable,
+                body,
+                span: _,
+            } => {
+                let iterable_val = self.interpret_expression(iterable)?;
+
+                match iterable_val {
+                    Value::List(elements) => {
+                        // Execute the body for each element
+                        self.environment.with_new_scope(|env| {
+                            let mut for_interpreter = Interpreter::with_environment(env.clone());
+
+                            for element in elements {
+                                // Bind the loop variable to the current element
+                                for_interpreter.environment.bind(variable.clone(), element);
+
+                                // Execute the body (but ignore its result)
+                                for_interpreter.interpret_expression(body)?;
+                            }
+
+                            Ok(Value::Unit)
+                        })
+                    }
+                    _ => Err(InterpreterError::TypeError {
+                        expected: "List".to_string(),
+                        found: iterable_val.type_name().to_string(),
+                        span: iterable.span().clone(),
+                    }),
+                }
+            }
+
+            Expression::Range {
+                start,
+                end,
+                span: _,
+            } => {
+                let start_val = self.interpret_expression(start)?;
+                let end_val = self.interpret_expression(end)?;
+
+                match (start_val, end_val) {
+                    (Value::Int(s), Value::Int(e)) => {
+                        let mut range_list = Vec::new();
+                        for i in s..e {
+                            range_list.push(Value::Int(i));
+                        }
+                        Ok(Value::List(range_list))
+                    }
+                    (Value::Int(_), other) => Err(InterpreterError::TypeError {
+                        expected: "Int".to_string(),
+                        found: other.type_name().to_string(),
+                        span: end.span().clone(),
+                    }),
+                    (other, _) => Err(InterpreterError::TypeError {
+                        expected: "Int".to_string(),
+                        found: other.type_name().to_string(),
+                        span: start.span().clone(),
+                    }),
+                }
             }
         }
     }
@@ -381,6 +454,51 @@ impl Interpreter {
                 let result = call_interpreter.interpret_expression(&body)?;
 
                 Ok(result)
+            }
+            Value::FixedPoint { function } => {
+                // For fixed point functions, we need to apply the function to itself first
+                // This implements the Y-combinator: fix(f) = f(fix(f))
+                if let Value::Function { param, body, env } = function.as_ref() {
+                    // Create a new environment with the recursive parameter bound to the fixed point itself
+                    let mut call_env = env.clone();
+                    call_env.push_scope();
+                    call_env.bind(
+                        param.clone(),
+                        Value::FixedPoint {
+                            function: function.clone(),
+                        },
+                    );
+
+                    // Now we need to interpret the body, which should return a function
+                    // that we then apply to the actual argument
+                    let mut recursive_interpreter = Interpreter::with_environment(call_env);
+                    let inner_func = recursive_interpreter.interpret_expression(&body)?;
+
+                    // Apply the inner function to the actual argument
+                    match inner_func {
+                        Value::Function {
+                            param: inner_param,
+                            body: inner_body,
+                            env: inner_env,
+                        } => {
+                            let mut final_env = inner_env;
+                            final_env.push_scope();
+                            final_env.bind(inner_param, arg_val);
+
+                            let mut final_interpreter = Interpreter::with_environment(final_env);
+                            final_interpreter.interpret_expression(&inner_body)
+                        }
+                        _ => Err(InterpreterError::RuntimeError {
+                            message: "Fixed point function body must return a function".to_string(),
+                            span: Some(span.clone()),
+                        }),
+                    }
+                } else {
+                    Err(InterpreterError::RuntimeError {
+                        message: "Invalid fixed point function".to_string(),
+                        span: Some(span.clone()),
+                    })
+                }
             }
             _ => Err(InterpreterError::NotCallable { span: span.clone() }),
         }
