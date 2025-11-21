@@ -243,6 +243,9 @@ impl Parser {
             Token::Fn => self.parse_function_expression(),
             Token::Fst => self.parse_first_projection(),
             Token::Snd => self.parse_second_projection(),
+            Token::Cons => self.parse_cons_expression(),
+            Token::Head => self.parse_head_projection(),
+            Token::Tail => self.parse_tail_projection(),
             Token::LeftParen => self.parse_parenthesized_or_pair_expression(),
             Token::LeftBracket => self.parse_list_expression(),
             token => Err(ParseError::UnexpectedToken {
@@ -549,5 +552,61 @@ impl Parser {
         );
 
         Ok(Expression::SecondProjection { pair, span })
+    }
+
+    fn parse_cons_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        self.consume(Token::LeftParen, "Expected '(' after 'cons'")?;
+        let head = Box::new(self.parse_expression()?);
+        self.consume(Token::Comma, "Expected ',' after head in cons")?;
+        let tail = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after tail in cons")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::Cons { head, tail, span })
+    }
+
+    fn parse_head_projection(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        self.consume(Token::LeftParen, "Expected '(' after 'head'")?;
+        let list = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after expression in head")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::HeadProjection { list, span })
+    }
+
+    fn parse_tail_projection(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        self.consume(Token::LeftParen, "Expected '(' after 'tail'")?;
+        let list = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after expression in tail")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::TailProjection { list, span })
     }
 }

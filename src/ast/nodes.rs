@@ -144,6 +144,20 @@ pub enum Expression {
         pair: Box<Expression>,
         span: Span,
     },
+    // List operations
+    Cons {
+        head: Box<Expression>,
+        tail: Box<Expression>,
+        span: Span,
+    },
+    HeadProjection {
+        list: Box<Expression>,
+        span: Span,
+    },
+    TailProjection {
+        list: Box<Expression>,
+        span: Span,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -215,6 +229,9 @@ impl Spanned for Expression {
             Expression::Block { span, .. } => span,
             Expression::FirstProjection { span, .. } => span,
             Expression::SecondProjection { span, .. } => span,
+            Expression::Cons { span, .. } => span,
+            Expression::HeadProjection { span, .. } => span,
+            Expression::TailProjection { span, .. } => span,
         }
     }
 }

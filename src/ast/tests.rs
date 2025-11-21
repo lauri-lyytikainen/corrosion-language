@@ -349,4 +349,99 @@ mod tests {
             _ => panic!("Expected expression statement"),
         }
     }
+
+    #[test]
+    fn test_parse_cons_expression() {
+        let tokens = vec![
+            create_token_with_span(Token::Cons),
+            create_token_with_span(Token::LeftParen),
+            create_token_with_span(Token::Number(1)),
+            create_token_with_span(Token::Comma),
+            create_token_with_span(Token::Identifier("list".to_string())),
+            create_token_with_span(Token::RightParen),
+            create_token_with_span(Token::Semicolon),
+            create_token_with_span(Token::Eof),
+        ];
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.statements.len(), 1);
+        match &program.statements[0] {
+            Statement::Expression { expression, .. } => match expression {
+                Expression::Cons { head, tail, .. } => {
+                    match &**head {
+                        Expression::Number { value: 1, .. } => (),
+                        _ => panic!("Expected head to be 1"),
+                    }
+                    match &**tail {
+                        Expression::Identifier { name, .. } => {
+                            assert_eq!(name, "list");
+                        }
+                        _ => panic!("Expected tail to be identifier 'list'"),
+                    }
+                }
+                _ => panic!("Expected cons expression"),
+            },
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_head_projection() {
+        let tokens = vec![
+            create_token_with_span(Token::Head),
+            create_token_with_span(Token::LeftParen),
+            create_token_with_span(Token::Identifier("list".to_string())),
+            create_token_with_span(Token::RightParen),
+            create_token_with_span(Token::Semicolon),
+            create_token_with_span(Token::Eof),
+        ];
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.statements.len(), 1);
+        match &program.statements[0] {
+            Statement::Expression { expression, .. } => match expression {
+                Expression::HeadProjection { list, .. } => match &**list {
+                    Expression::Identifier { name, .. } => {
+                        assert_eq!(name, "list");
+                    }
+                    _ => panic!("Expected list to be identifier 'list'"),
+                },
+                _ => panic!("Expected head projection"),
+            },
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_parse_tail_projection() {
+        let tokens = vec![
+            create_token_with_span(Token::Tail),
+            create_token_with_span(Token::LeftParen),
+            create_token_with_span(Token::Identifier("list".to_string())),
+            create_token_with_span(Token::RightParen),
+            create_token_with_span(Token::Semicolon),
+            create_token_with_span(Token::Eof),
+        ];
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        assert_eq!(program.statements.len(), 1);
+        match &program.statements[0] {
+            Statement::Expression { expression, .. } => match expression {
+                Expression::TailProjection { list, .. } => match &**list {
+                    Expression::Identifier { name, .. } => {
+                        assert_eq!(name, "list");
+                    }
+                    _ => panic!("Expected list to be identifier 'list'"),
+                },
+                _ => panic!("Expected tail projection"),
+            },
+            _ => panic!("Expected expression statement"),
+        }
+    }
 }

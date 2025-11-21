@@ -1,6 +1,6 @@
+use super::{Environment, InterpreterError, InterpreterResult, Value};
 use crate::ast::nodes::{BinaryOperator, Expression, Program, Statement};
 use crate::lexer::tokens::Span;
-use super::{Environment, InterpreterError, InterpreterResult, Value};
 
 /// Interpreter for the Corrosion language
 pub struct Interpreter {
@@ -35,18 +35,12 @@ impl Interpreter {
     /// Interpret a single statement
     pub fn interpret_statement(&mut self, statement: &Statement) -> InterpreterResult<Value> {
         match statement {
-            Statement::VariableDeclaration {
-                name,
-                value,
-                ..
-            } => {
+            Statement::VariableDeclaration { name, value, .. } => {
                 let val = self.interpret_expression(value)?;
                 self.environment.bind(name.clone(), val);
                 Ok(Value::Unit)
             }
-            Statement::Expression { expression, .. } => {
-                self.interpret_expression(expression)
-            }
+            Statement::Expression { expression, .. } => self.interpret_expression(expression),
         }
     }
 
@@ -58,13 +52,12 @@ impl Interpreter {
             Expression::Boolean { value, .. } => Ok(Value::Bool(*value)),
 
             Expression::Identifier { name, span } => {
-                self.environment
-                    .lookup(name)
-                    .cloned()
-                    .ok_or_else(|| InterpreterError::UndefinedVariable {
+                self.environment.lookup(name).cloned().ok_or_else(|| {
+                    InterpreterError::UndefinedVariable {
                         name: name.clone(),
                         span: span.clone(),
-                    })
+                    }
+                })
             }
 
             Expression::List { elements, .. } => {
@@ -128,12 +121,12 @@ impl Interpreter {
                 // Execute block in a new scope
                 self.environment.with_new_scope(|env| {
                     let mut interpreter = Interpreter::with_environment(env.clone());
-                    
+
                     // Execute all statements
                     for stmt in statements {
                         interpreter.interpret_statement(stmt)?;
                     }
-                    
+
                     // Return the final expression if present, otherwise Unit
                     if let Some(expr) = expression {
                         interpreter.interpret_expression(expr)
@@ -162,6 +155,67 @@ impl Interpreter {
                     _ => Err(InterpreterError::TypeError {
                         expected: "Pair".to_string(),
                         found: pair_val.type_name().to_string(),
+                        span: span.clone(),
+                    }),
+                }
+            }
+
+            Expression::Cons { head, tail, span } => {
+                let head_val = self.interpret_expression(head)?;
+                let tail_val = self.interpret_expression(tail)?;
+
+                match tail_val {
+                    Value::List(mut list) => {
+                        // Insert the head at the beginning of the list
+                        list.insert(0, head_val);
+                        Ok(Value::List(list))
+                    }
+                    _ => Err(InterpreterError::TypeError {
+                        expected: "List".to_string(),
+                        found: tail_val.type_name().to_string(),
+                        span: span.clone(),
+                    }),
+                }
+            }
+
+            Expression::HeadProjection { list, span } => {
+                let list_val = self.interpret_expression(list)?;
+                match list_val {
+                    Value::List(list) => {
+                        if list.is_empty() {
+                            Err(InterpreterError::RuntimeError {
+                                message: "Cannot get head of empty list".to_string(),
+                                span: Some(span.clone()),
+                            })
+                        } else {
+                            Ok(list[0].clone())
+                        }
+                    }
+                    _ => Err(InterpreterError::TypeError {
+                        expected: "List".to_string(),
+                        found: list_val.type_name().to_string(),
+                        span: span.clone(),
+                    }),
+                }
+            }
+
+            Expression::TailProjection { list, span } => {
+                let list_val = self.interpret_expression(list)?;
+                match list_val {
+                    Value::List(list) => {
+                        if list.is_empty() {
+                            Err(InterpreterError::RuntimeError {
+                                message: "Cannot get tail of empty list".to_string(),
+                                span: Some(span.clone()),
+                            })
+                        } else {
+                            // Return all elements except the first
+                            Ok(Value::List(list[1..].to_vec()))
+                        }
+                    }
+                    _ => Err(InterpreterError::TypeError {
+                        expected: "List".to_string(),
+                        found: list_val.type_name().to_string(),
                         span: span.clone(),
                     }),
                 }
@@ -212,9 +266,7 @@ impl Interpreter {
             BinaryOperator::Divide => match (&left_val, &right_val) {
                 (Value::Int(l), Value::Int(r)) => {
                     if *r == 0 {
-                        Err(InterpreterError::DivisionByZero {
-                            span: span.clone(),
-                        })
+                        Err(InterpreterError::DivisionByZero { span: span.clone() })
                     } else {
                         Ok(Value::Int(l / r))
                     }
@@ -277,12 +329,10 @@ impl Interpreter {
             }
 
             // Assignment (not typically used in expressions, but included for completeness)
-            BinaryOperator::Assign => {
-                Err(InterpreterError::RuntimeError {
-                    message: "Assignment operator not supported in expressions".to_string(),
-                    span: Some(span.clone()),
-                })
-            }
+            BinaryOperator::Assign => Err(InterpreterError::RuntimeError {
+                message: "Assignment operator not supported in expressions".to_string(),
+                span: Some(span.clone()),
+            }),
         }
     }
 
@@ -309,9 +359,7 @@ impl Interpreter {
 
                 Ok(result)
             }
-            _ => Err(InterpreterError::NotCallable {
-                span: span.clone(),
-            }),
+            _ => Err(InterpreterError::NotCallable { span: span.clone() }),
         }
     }
 

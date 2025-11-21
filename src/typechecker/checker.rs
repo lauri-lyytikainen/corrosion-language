@@ -363,6 +363,63 @@ impl TypeChecker {
                     }),
                 }
             }
+            Expression::Cons { head, tail, span } => {
+                let head_typed = self.check_expression(head)?;
+                let tail_typed = self.check_expression(tail)?;
+
+                match &tail_typed.ty {
+                    Type::List { element } => {
+                        // Check if head type matches the list element type
+                        if self.types_compatible(&head_typed.ty, element) {
+                            Ok(TypedExpression::new(tail_typed.ty.clone(), span.clone()))
+                        } else {
+                            Err(TypeError::TypeMismatch {
+                                expected: (**element).clone(),
+                                found: head_typed.ty.clone(),
+                                span: head.span().clone(),
+                            })
+                        }
+                    }
+                    _ => Err(TypeError::TypeMismatch {
+                        expected: Type::List {
+                            element: Box::new(Type::Unknown),
+                        },
+                        found: tail_typed.ty.clone(),
+                        span: tail.span().clone(),
+                    }),
+                }
+            }
+            Expression::HeadProjection { list, span } => {
+                let list_typed = self.check_expression(list)?;
+                match &list_typed.ty {
+                    Type::List { element } => {
+                        Ok(TypedExpression::new((**element).clone(), span.clone()))
+                    }
+                    _ => Err(TypeError::TypeMismatch {
+                        expected: Type::List {
+                            element: Box::new(Type::Unknown),
+                        },
+                        found: list_typed.ty.clone(),
+                        span: span.clone(),
+                    }),
+                }
+            }
+            Expression::TailProjection { list, span } => {
+                let list_typed = self.check_expression(list)?;
+                match &list_typed.ty {
+                    Type::List { .. } => {
+                        // Tail of a list has the same type as the original list
+                        Ok(TypedExpression::new(list_typed.ty.clone(), span.clone()))
+                    }
+                    _ => Err(TypeError::TypeMismatch {
+                        expected: Type::List {
+                            element: Box::new(Type::Unknown),
+                        },
+                        found: list_typed.ty.clone(),
+                        span: span.clone(),
+                    }),
+                }
+            }
         }
     }
 

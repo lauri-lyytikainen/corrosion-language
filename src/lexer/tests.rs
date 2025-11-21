@@ -371,13 +371,7 @@ mod tests {
         let tokens = tokenize_input("fn fix inl inr").unwrap();
         assert_eq!(
             tokens,
-            vec![
-                Token::Fn,
-                Token::Fix,
-                Token::Inl,
-                Token::Inr,
-                Token::Eof
-            ]
+            vec![Token::Fn, Token::Fix, Token::Inl, Token::Inr, Token::Eof]
         );
     }
 
@@ -404,11 +398,7 @@ mod tests {
         let tokens = tokenize_input("{ }").unwrap();
         assert_eq!(
             tokens,
-            vec![
-                Token::LeftBrace,
-                Token::RightBrace,
-                Token::Eof
-            ]
+            vec![Token::LeftBrace, Token::RightBrace, Token::Eof]
         );
     }
 
@@ -435,14 +425,7 @@ mod tests {
     #[test]
     fn test_pair_destructuring_keywords() {
         let tokens = tokenize_input("fst snd").unwrap();
-        assert_eq!(
-            tokens,
-            vec![
-                Token::Fst,
-                Token::Snd,
-                Token::Eof
-            ]
-        );
+        assert_eq!(tokens, vec![Token::Fst, Token::Snd, Token::Eof]);
     }
 
     #[test]
@@ -458,6 +441,40 @@ mod tests {
                 Token::Snd,
                 Token::LeftParen,
                 Token::Identifier("pair".to_string()),
+                Token::RightParen,
+                Token::Eof
+            ]
+        );
+    }
+
+    #[test]
+    fn test_list_operation_keywords() {
+        let tokens = tokenize_input("cons head tail").unwrap();
+        assert_eq!(
+            tokens,
+            vec![Token::Cons, Token::Head, Token::Tail, Token::Eof]
+        );
+    }
+
+    #[test]
+    fn test_list_operation_syntax() {
+        let tokens = tokenize_input("cons(1, list) head(list) tail(list)").unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Cons,
+                Token::LeftParen,
+                Token::Number(1),
+                Token::Comma,
+                Token::Identifier("list".to_string()),
+                Token::RightParen,
+                Token::Head,
+                Token::LeftParen,
+                Token::Identifier("list".to_string()),
+                Token::RightParen,
+                Token::Tail,
+                Token::LeftParen,
+                Token::Identifier("list".to_string()),
                 Token::RightParen,
                 Token::Eof
             ]

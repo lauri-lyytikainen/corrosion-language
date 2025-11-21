@@ -17,6 +17,11 @@ pub enum Token {
     Fst, // fst (first element)
     Snd, // snd (second element)
 
+    // List operations
+    Cons, // cons (construct list)
+    Head, // head (first element of list)
+    Tail, // tail (rest of list)
+
     // Sum type constructors
     Inl, // inl (left injection)
     Inr, // inr (right injection)
