@@ -1,7 +1,7 @@
 use nom::{
     IResult, Parser,
     branch::alt,
-    bytes::complete::tag,
+    bytes::complete::{tag, take_while},
     character::complete::{alpha1, alphanumeric1, char, digit1, multispace0},
     combinator::{recognize, value},
     multi::many0,
@@ -221,6 +221,37 @@ fn parse_punctuation(input: &str) -> IResult<&str, Token> {
     .parse(input)
 }
 
+fn parse_single_line_comment(input: &str) -> IResult<&str, ()> {
+    let (input, _) = tag("//")(input)?;
+    let (input, _) = take_while(|c| c != '\n')(input)?;
+    Ok((input, ()))
+}
+
+fn parse_multi_line_comment(input: &str) -> IResult<&str, ()> {
+    let (input, _) = tag("/*")(input)?;
+    let mut remaining = input;
+
+    loop {
+        if remaining.is_empty() {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+
+        if remaining.starts_with("*/") {
+            let (rest, _) = tag("*/")(remaining)?;
+            return Ok((rest, ()));
+        }
+
+        remaining = &remaining[1..];
+    }
+}
+
+fn parse_comment(input: &str) -> IResult<&str, ()> {
+    alt((parse_single_line_comment, parse_multi_line_comment)).parse(input)
+}
+
 fn parse_single_token(input: &str) -> IResult<&str, Token> {
     alt((
         parse_operators,
@@ -231,12 +262,36 @@ fn parse_single_token(input: &str) -> IResult<&str, Token> {
     .parse(input)
 }
 
+fn skip_whitespace_and_comments(input: &str) -> IResult<&str, &str> {
+    let mut remaining = input;
+
+    loop {
+        let start_len = remaining.len();
+
+        // Skip whitespace
+        let (after_ws, _) = multispace0(remaining)?;
+        remaining = after_ws;
+
+        // Try to skip a comment
+        if let Ok((after_comment, _)) = parse_comment(remaining) {
+            remaining = after_comment;
+        }
+
+        // If nothing was consumed, we're done
+        if remaining.len() == start_len {
+            break;
+        }
+    }
+
+    Ok((remaining, &input[..input.len() - remaining.len()]))
+}
+
 fn parse_token_with_whitespace<'a>(
     input: &'a str,
     original_input: &str,
     offset: usize,
 ) -> IResult<&'a str, Option<TokenWithSpan>> {
-    let (input_after_ws, _) = multispace0(input)?;
+    let (input_after_ws, _) = skip_whitespace_and_comments(input)?;
 
     if input_after_ws.is_empty() {
         return Ok((input_after_ws, None));
