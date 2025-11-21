@@ -48,7 +48,7 @@ impl Repl {
                     }
 
                     match self.process_line(line) {
-                        Ok(result) => println!("{}", result),
+                        Ok(_result) => { /* Do nothing - no result display */ },
                         Err(error) => println!("Error: {}", error),
                     }
                 }
@@ -75,7 +75,7 @@ impl Repl {
                 _ if cmd.starts_with("load ") => {
                     let filename = cmd.strip_prefix("load ").unwrap().trim();
                     match self.load_file(filename) {
-                        Ok(result) => println!("{}", result),
+                        Ok(_result) => println!("Successfully loaded '{}'", filename),
                         Err(error) => println!("Error loading file: {}", error),
                     }
                     true
@@ -120,7 +120,7 @@ impl Repl {
 
         // Process the file contents using the same pipeline as process_line
         match self.process_content(&contents) {
-            Ok(result) => Ok(format!("Successfully loaded '{}': {}", filename, result)),
+            Ok(_result) => Ok(format!("loaded")),
             Err(error) => Err(format!("Error processing '{}': {}", filename, error)),
         }
     }

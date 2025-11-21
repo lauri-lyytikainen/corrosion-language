@@ -23,13 +23,11 @@ impl Interpreter {
 
     /// Interpret a program and return the result
     pub fn interpret_program(&mut self, program: &Program) -> InterpreterResult<Value> {
-        let mut last_value = Value::Unit;
-
         for statement in &program.statements {
-            last_value = self.interpret_statement(statement)?;
+            self.interpret_statement(statement)?;
         }
 
-        Ok(last_value)
+        Ok(Value::Unit)
     }
 
     /// Interpret a single statement
@@ -80,6 +78,25 @@ impl Interpreter {
                 right,
                 span,
             } => self.interpret_binary_op(left, operator, right, span),
+
+            Expression::UnaryOp {
+                operator,
+                operand,
+                span,
+            } => {
+                let operand_val = self.interpret_expression(operand)?;
+
+                match operator {
+                    crate::ast::nodes::UnaryOperator::LogicalNot => match operand_val {
+                        Value::Bool(b) => Ok(Value::Bool(!b)),
+                        _ => Err(InterpreterError::TypeError {
+                            expected: "Bool".to_string(),
+                            found: operand_val.type_name().to_string(),
+                            span: span.clone(),
+                        }),
+                    },
+                }
+            }
 
             Expression::Function { param, body, .. } => {
                 Ok(Value::Function {
@@ -219,6 +236,12 @@ impl Interpreter {
                         span: span.clone(),
                     }),
                 }
+            }
+
+            Expression::Print { value, span: _ } => {
+                let val = self.interpret_expression(value)?;
+                println!("{}", val);
+                Ok(Value::Unit)
             }
         }
     }

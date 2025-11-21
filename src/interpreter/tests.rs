@@ -33,6 +33,52 @@ mod tests {
     }
 
     #[test]
+    fn test_logical_not_operation() {
+        use crate::ast::nodes::UnaryOperator;
+        let mut interpreter = Interpreter::new();
+
+        // Test !true
+        let not_true_expr = Expression::UnaryOp {
+            operator: UnaryOperator::LogicalNot,
+            operand: Box::new(Expression::Boolean {
+                value: true,
+                span: create_test_span(),
+            }),
+            span: create_test_span(),
+        };
+        let result = interpreter.interpret_expression(&not_true_expr).unwrap();
+        assert_eq!(result, Value::Bool(false));
+
+        // Test !false
+        let not_false_expr = Expression::UnaryOp {
+            operator: UnaryOperator::LogicalNot,
+            operand: Box::new(Expression::Boolean {
+                value: false,
+                span: create_test_span(),
+            }),
+            span: create_test_span(),
+        };
+        let result = interpreter.interpret_expression(&not_false_expr).unwrap();
+        assert_eq!(result, Value::Bool(true));
+
+        // Test !!true (nested)
+        let double_not_expr = Expression::UnaryOp {
+            operator: UnaryOperator::LogicalNot,
+            operand: Box::new(Expression::UnaryOp {
+                operator: UnaryOperator::LogicalNot,
+                operand: Box::new(Expression::Boolean {
+                    value: true,
+                    span: create_test_span(),
+                }),
+                span: create_test_span(),
+            }),
+            span: create_test_span(),
+        };
+        let result = interpreter.interpret_expression(&double_not_expr).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
     fn test_interpret_list() {
         let mut interpreter = Interpreter::new();
         let expr = Expression::List {
@@ -109,8 +155,18 @@ mod tests {
             create_test_span(),
         );
 
+        // After removing the last statement return feature, programs now return Unit
         let result = interpreter.interpret_program(&program).unwrap();
-        assert_eq!(result, Value::Int(42));
+        assert_eq!(result, Value::Unit);
+
+        // Verify that the variable was properly declared and can be accessed
+        let x_value = interpreter
+            .interpret_expression(&Expression::Identifier {
+                name: "x".to_string(),
+                span: create_test_span(),
+            })
+            .unwrap();
+        assert_eq!(x_value, Value::Int(42));
     }
 
     #[test]
@@ -609,5 +665,43 @@ mod tests {
 
         let result = interpreter.interpret_expression(&head_expr).unwrap();
         assert_eq!(result, Value::Int(1));
+    }
+
+    #[test]
+    fn test_print_expression() {
+        let mut interpreter = Interpreter::new();
+
+        // Test printing an integer
+        let print_expr = Expression::Print {
+            value: Box::new(Expression::Number {
+                value: 42,
+                span: create_test_span(),
+            }),
+            span: create_test_span(),
+        };
+
+        let result = interpreter.interpret_expression(&print_expr).unwrap();
+        assert_eq!(result, Value::Unit);
+
+        // Test printing a list
+        let print_list_expr = Expression::Print {
+            value: Box::new(Expression::List {
+                elements: vec![
+                    Expression::Number {
+                        value: 1,
+                        span: create_test_span(),
+                    },
+                    Expression::Number {
+                        value: 2,
+                        span: create_test_span(),
+                    },
+                ],
+                span: create_test_span(),
+            }),
+            span: create_test_span(),
+        };
+
+        let result = interpreter.interpret_expression(&print_list_expr).unwrap();
+        assert_eq!(result, Value::Unit);
     }
 }

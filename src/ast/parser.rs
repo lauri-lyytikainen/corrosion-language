@@ -178,7 +178,7 @@ impl Parser {
     }
 
     fn parse_call_expression(&mut self) -> ParseResult<Expression> {
-        let mut expr = self.parse_primary()?;
+        let mut expr = self.parse_unary_expression()?;
 
         while !self.is_at_end() && self.peek().token == Token::LeftParen {
             self.advance(); // consume '('
@@ -221,6 +221,33 @@ impl Parser {
         }
     }
 
+    fn parse_unary_expression(&mut self) -> ParseResult<Expression> {
+        use crate::ast::nodes::UnaryOperator;
+
+        // Check if this is a unary operator
+        let token = &self.peek().token;
+        if matches!(token, Token::LogicalNot) {
+            let operator_token = self.advance();
+            let operator_span = operator_token.span.clone();
+            let operator = UnaryOperator::from(operator_token.token.clone());
+            let operand = Box::new(self.parse_unary_expression()?);
+            let span = Span::new(
+                operator_span.start,
+                operand.span().end,
+                operator_span.line,
+                operator_span.column,
+            );
+
+            Ok(Expression::UnaryOp {
+                operator,
+                operand,
+                span,
+            })
+        } else {
+            self.parse_primary()
+        }
+    }
+
     fn parse_primary(&mut self) -> ParseResult<Expression> {
         let token = self.advance().token.clone();
         match token {
@@ -246,6 +273,7 @@ impl Parser {
             Token::Cons => self.parse_cons_expression(),
             Token::Head => self.parse_head_projection(),
             Token::Tail => self.parse_tail_projection(),
+            Token::Print => self.parse_print_expression(),
             Token::LeftParen => self.parse_parenthesized_or_pair_expression(),
             Token::LeftBracket => self.parse_list_expression(),
             token => Err(ParseError::UnexpectedToken {
@@ -608,5 +636,23 @@ impl Parser {
         );
 
         Ok(Expression::TailProjection { list, span })
+    }
+
+    fn parse_print_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        self.consume(Token::LeftParen, "Expected '(' after 'print'")?;
+        let value = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after expression in print")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::Print { value, span })
     }
 }

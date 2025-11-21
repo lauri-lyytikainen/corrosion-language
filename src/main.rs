@@ -1,9 +1,9 @@
 pub mod ast;
-pub mod lexer;
-pub mod typechecker;
 pub mod interpreter;
+pub mod lexer;
 mod repl;
 mod tests;
+pub mod typechecker;
 
 use repl::Repl;
 use std::env;
@@ -37,9 +37,9 @@ fn main() {
 
 fn load_and_execute_file(filename: &str) -> Result<(), String> {
     use crate::ast::Parser;
+    use crate::interpreter::Interpreter;
     use crate::lexer::Tokenizer;
     use crate::typechecker::TypeChecker;
-    use crate::interpreter::Interpreter;
     use std::fs;
 
     // Read the file contents
@@ -62,11 +62,9 @@ fn load_and_execute_file(filename: &str) -> Result<(), String> {
 
     // Execute the program with the interpreter
     let mut interpreter = Interpreter::new();
-    let result = interpreter
+    let _result = interpreter
         .interpret_program(&program)
         .map_err(|e| format!("Runtime error: {}", e))?;
-
-    println!("Program result: {}", result);
 
     Ok(())
 }

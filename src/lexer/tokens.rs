@@ -22,6 +22,9 @@ pub enum Token {
     Head, // head (first element of list)
     Tail, // tail (rest of list)
 
+    // Built-in functions
+    Print, // print (output to console)
+
     // Sum type constructors
     Inl, // inl (left injection)
     Inr, // inr (right injection)

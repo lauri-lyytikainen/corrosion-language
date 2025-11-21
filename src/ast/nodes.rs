@@ -93,6 +93,11 @@ pub enum Expression {
         right: Box<Expression>,
         span: Span,
     },
+    UnaryOp {
+        operator: UnaryOperator,
+        operand: Box<Expression>,
+        span: Span,
+    },
     // Function expressions
     Function {
         param: String, // Parameter name
@@ -158,6 +163,16 @@ pub enum Expression {
         list: Box<Expression>,
         span: Span,
     },
+    // Built-in functions
+    Print {
+        value: Box<Expression>,
+        span: Span,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UnaryOperator {
+    LogicalNot,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -175,6 +190,15 @@ pub enum BinaryOperator {
     GreaterThanEqual,
     LogicalAnd,
     LogicalOr,
+}
+
+impl From<Token> for UnaryOperator {
+    fn from(token: Token) -> Self {
+        match token {
+            Token::LogicalNot => UnaryOperator::LogicalNot,
+            _ => panic!("Invalid unary operator token: {:?}", token),
+        }
+    }
 }
 
 impl From<Token> for BinaryOperator {
@@ -219,6 +243,7 @@ impl Spanned for Expression {
             Expression::Number { span, .. } => span,
             Expression::Boolean { span, .. } => span,
             Expression::BinaryOp { span, .. } => span,
+            Expression::UnaryOp { span, .. } => span,
             Expression::Function { span, .. } => span,
             Expression::FunctionCall { span, .. } => span,
             Expression::List { span, .. } => span,
@@ -232,6 +257,7 @@ impl Spanned for Expression {
             Expression::Cons { span, .. } => span,
             Expression::HeadProjection { span, .. } => span,
             Expression::TailProjection { span, .. } => span,
+            Expression::Print { span, .. } => span,
         }
     }
 }

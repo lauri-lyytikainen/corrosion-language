@@ -207,6 +207,27 @@ impl TypeChecker {
                     }),
                 }
             }
+            Expression::UnaryOp {
+                operator,
+                operand,
+                span,
+            } => {
+                let typed_operand = self.check_expression(operand)?;
+
+                match operator {
+                    crate::ast::nodes::UnaryOperator::LogicalNot => {
+                        if typed_operand.ty == Type::Bool {
+                            Ok(TypedExpression::new(Type::Bool, span.clone()))
+                        } else {
+                            Err(TypeError::TypeMismatch {
+                                expected: Type::Bool,
+                                found: typed_operand.ty,
+                                span: span.clone(),
+                            })
+                        }
+                    }
+                }
+            }
             Expression::Function { param, body, span } => {
                 // Use type inference to determine parameter type
                 let param_type = self.infer_parameter_type(param, body)?;
@@ -419,6 +440,12 @@ impl TypeChecker {
                         span: span.clone(),
                     }),
                 }
+            }
+            Expression::Print { value, span } => {
+                // Type check the value being printed (but we don't need the result)
+                let _ = self.check_expression(value)?;
+                // Print always returns Unit type
+                Ok(TypedExpression::new(Type::Unit, span.clone()))
             }
         }
     }
