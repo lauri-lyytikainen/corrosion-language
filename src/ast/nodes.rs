@@ -187,6 +187,15 @@ pub enum Expression {
         end: Box<Expression>,
         span: Span,
     },
+    // Pattern matching
+    Case {
+        expression: Box<Expression>,
+        left_pattern: String,
+        left_body: Box<Expression>,
+        right_pattern: String,
+        right_body: Box<Expression>,
+        span: Span,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -280,6 +289,7 @@ impl Spanned for Expression {
             Expression::If { span, .. } => span,
             Expression::For { span, .. } => span,
             Expression::Range { span, .. } => span,
+            Expression::Case { span, .. } => span,
         }
     }
 }

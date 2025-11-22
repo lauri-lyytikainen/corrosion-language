@@ -68,7 +68,15 @@ impl Type {
             // Error propagation
             (Type::Error, _, _) | (_, _, Type::Error) => Some(Type::Error),
 
-            // Unknown type inference
+            // Unknown type inference - but respect operation semantics
+            (Type::Unknown, BinaryOp::Equal, _) | (_, BinaryOp::Equal, Type::Unknown) => Some(Type::Bool),
+            (Type::Unknown, BinaryOp::NotEqual, _) | (_, BinaryOp::NotEqual, Type::Unknown) => Some(Type::Bool),
+            (Type::Unknown, BinaryOp::LessThan, _) | (_, BinaryOp::LessThan, Type::Unknown) => Some(Type::Bool),
+            (Type::Unknown, BinaryOp::LessThanEqual, _) | (_, BinaryOp::LessThanEqual, Type::Unknown) => Some(Type::Bool),
+            (Type::Unknown, BinaryOp::GreaterThan, _) | (_, BinaryOp::GreaterThan, Type::Unknown) => Some(Type::Bool),
+            (Type::Unknown, BinaryOp::GreaterThanEqual, _) | (_, BinaryOp::GreaterThanEqual, Type::Unknown) => Some(Type::Bool),
+            (Type::Unknown, BinaryOp::LogicalAnd, _) | (_, BinaryOp::LogicalAnd, Type::Unknown) => Some(Type::Bool),
+            (Type::Unknown, BinaryOp::LogicalOr, _) | (_, BinaryOp::LogicalOr, Type::Unknown) => Some(Type::Bool),
             (Type::Unknown, _, rhs) => Some(rhs.clone()),
             (lhs, _, Type::Unknown) => Some(lhs.clone()),
 

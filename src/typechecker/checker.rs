@@ -350,11 +350,100 @@ impl TypeChecker {
 
                 Ok(TypedExpression::new(pair_type, span.clone()))
             }
-            Expression::LeftInject { .. } => {
-                Ok(TypedExpression::new(Type::Error, expression.span().clone()))
+            Expression::LeftInject { value, span } => {
+                let typed_value = self.check_expression(value)?;
+                Ok(TypedExpression::new(
+                    Type::Sum {
+                        left: Box::new(typed_value.ty),
+                        right: Box::new(Type::Unknown),
+                    },
+                    span.clone(),
+                ))
             }
-            Expression::RightInject { .. } => {
-                Ok(TypedExpression::new(Type::Error, expression.span().clone()))
+            Expression::RightInject { value, span } => {
+                let typed_value = self.check_expression(value)?;
+                Ok(TypedExpression::new(
+                    Type::Sum {
+                        left: Box::new(Type::Unknown),
+                        right: Box::new(typed_value.ty),
+                    },
+                    span.clone(),
+                ))
+            }
+            Expression::Case {
+                expression,
+                left_pattern,
+                left_body,
+                right_pattern,
+                right_body,
+                span,
+            } => {
+                let typed_expr = self.check_expression(expression)?;
+
+                match &typed_expr.ty {
+                    Type::Sum { left, right } => {
+                        // Check left branch
+                        let mut left_checker = TypeChecker {
+                            environment: Environment::with_parent(self.environment.clone()),
+                            errors: Vec::new(),
+                        };
+                        // Handle Unknown type in sum (from inference)
+                        let left_type = if **left == Type::Unknown {
+                            // If we don't know the type, we can't check the body properly unless we infer it.
+                            // For now, let's assume Unknown propagates or we treat it as Unknown.
+                            // But better to bind it as Unknown.
+                            Type::Unknown
+                        } else {
+                            *left.clone()
+                        };
+
+                        left_checker
+                            .environment
+                            .bind(left_pattern.clone(), left_type);
+                        let typed_left_body = left_checker.check_expression(left_body)?;
+
+                        // Check right branch
+                        let mut right_checker = TypeChecker {
+                            environment: Environment::with_parent(self.environment.clone()),
+                            errors: Vec::new(),
+                        };
+                        let right_type = if **right == Type::Unknown {
+                            Type::Unknown
+                        } else {
+                            *right.clone()
+                        };
+
+                        right_checker
+                            .environment
+                            .bind(right_pattern.clone(), right_type);
+                        let typed_right_body = right_checker.check_expression(right_body)?;
+
+                        // Ensure branches return compatible types
+                        if self.types_compatible(&typed_left_body.ty, &typed_right_body.ty) {
+                            // If one is Unknown, prefer the other
+                            let result_type = if typed_left_body.ty == Type::Unknown {
+                                typed_right_body.ty
+                            } else {
+                                typed_left_body.ty
+                            };
+                            Ok(TypedExpression::new(result_type, span.clone()))
+                        } else {
+                            Err(TypeError::TypeMismatch {
+                                expected: typed_left_body.ty,
+                                found: typed_right_body.ty,
+                                span: right_body.span().clone(),
+                            })
+                        }
+                    }
+                    _ => Err(TypeError::TypeMismatch {
+                        expected: Type::Sum {
+                            left: Box::new(Type::Unknown),
+                            right: Box::new(Type::Unknown),
+                        },
+                        found: typed_expr.ty.clone(),
+                        span: expression.span().clone(),
+                    }),
+                }
             }
             Expression::Fix { function, span } => {
                 // Type check the function expression
@@ -612,18 +701,20 @@ impl TypeChecker {
 
                 if let Some(else_branch) = else_branch {
                     let else_typed = self.check_expression(else_branch)?;
-                    // Check if types are compatible
-                    if !then_typed.ty.is_assignable_to(&else_typed.ty)
-                        && !else_typed.ty.is_assignable_to(&then_typed.ty)
+
+                    // If both branches have the same type, use that type
+                    if then_typed.ty.is_assignable_to(&else_typed.ty)
+                        && else_typed.ty.is_assignable_to(&then_typed.ty)
                     {
-                        return Err(TypeError::TypeMismatch {
-                            expected: then_typed.ty,
-                            found: else_typed.ty,
-                            span: else_branch.span().clone(),
-                        });
+                        Ok(TypedExpression::new(then_typed.ty, span.clone()))
+                    } else {
+                        // Different types - create a sum type
+                        let sum_type = Type::Sum {
+                            left: Box::new(then_typed.ty),
+                            right: Box::new(else_typed.ty),
+                        };
+                        Ok(TypedExpression::new(sum_type, span.clone()))
                     }
-                    // Return the type of the branches
-                    Ok(TypedExpression::new(then_typed.ty, span.clone()))
                 } else {
                     // If there is no else branch, the expression must return Unit
                     // and the then branch must also be Unit
@@ -735,6 +826,34 @@ impl TypeChecker {
 
                 Ok(Type::List {
                     element: refined_element,
+                })
+            }
+            // Handle sum types with Unknown components
+            (
+                Type::Sum {
+                    left: inf_left,
+                    right: inf_right,
+                },
+                Type::Sum {
+                    left: ann_left,
+                    right: ann_right,
+                },
+            ) => {
+                let refined_left = if matches!(**inf_left, Type::Unknown) {
+                    ann_left.clone()
+                } else {
+                    inf_left.clone()
+                };
+
+                let refined_right = if matches!(**inf_right, Type::Unknown) {
+                    ann_right.clone()
+                } else {
+                    inf_right.clone()
+                };
+
+                Ok(Type::Sum {
+                    left: refined_left,
+                    right: refined_right,
                 })
             }
             // For non-function/non-list types, return the inferred type as-is

@@ -36,6 +36,12 @@ pub enum Token {
     Inl, // inl (left injection)
     Inr, // inr (right injection)
 
+    // Sum type pattern matching
+    Case,     // case
+    Of,       // of
+    Pipe,     // |
+    FatArrow, // =>
+
     // Boolean literals
     True,  // true
     False, // false

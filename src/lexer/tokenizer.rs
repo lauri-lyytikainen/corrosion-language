@@ -82,6 +82,8 @@ fn parse_identifier_or_keyword(input: &str) -> IResult<&str, Token> {
             "range" => Token::Range,
             "inl" => Token::Inl,
             "inr" => Token::Inr,
+            "case" => Token::Case,
+            "of" => Token::Of,
             "true" => Token::True,
             "false" => Token::False,
             _ => Token::Identifier(s.to_string()),
@@ -189,9 +191,18 @@ fn parse_logical_not(input: &str) -> IResult<&str, Token> {
     value(Token::LogicalNot, char('!')).parse(input)
 }
 
+fn parse_pipe(input: &str) -> IResult<&str, Token> {
+    value(Token::Pipe, char('|')).parse(input)
+}
+
+fn parse_fat_arrow(input: &str) -> IResult<&str, Token> {
+    value(Token::FatArrow, tag("=>")).parse(input)
+}
+
 fn parse_operators(input: &str) -> IResult<&str, Token> {
     alt((
         // Multi-character operators must come before their prefixes
+        parse_fat_arrow,          // => must come before =
         parse_arrow,              // -> must come before -
         parse_equal,              // == must come before =
         parse_not_equal,          // != must come before !
@@ -208,6 +219,7 @@ fn parse_operators(input: &str) -> IResult<&str, Token> {
         parse_less_than,
         parse_greater_than,
         parse_logical_not,
+        parse_pipe,
     ))
     .parse(input)
 }

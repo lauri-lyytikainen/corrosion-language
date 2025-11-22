@@ -243,4 +243,72 @@ mod new_features_tests {
             _ => panic!("Expected variable declaration"),
         }
     }
+
+    #[test]
+    fn test_sum_type_inl() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("inl(5);").unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).unwrap();
+
+        match &typed_program.statements[0] {
+            crate::typechecker::TypedStatement::Expression { expression, .. } => {
+                match &expression.ty {
+                    Type::Sum { left, right } => {
+                        assert_eq!(**left, Type::Int);
+                        assert_eq!(**right, Type::Unknown);
+                    }
+                    _ => panic!("Expected Sum type"),
+                }
+            }
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_sum_type_case() {
+        let input = "
+        let x = inl(5);
+        case x of
+          inl a => a + 1
+        | inr b => 0;
+        ";
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize(input).unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).unwrap();
+
+        match &typed_program.statements[1] {
+            crate::typechecker::TypedStatement::Expression { expression, .. } => {
+                assert_eq!(expression.ty, Type::Int);
+            }
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_sum_type_annotation() {
+        let input = "let x: Int + Bool = inl(5);";
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize(input).unwrap();
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).unwrap();
+
+        match &typed_program.statements[0] {
+            crate::typechecker::TypedStatement::VariableDeclaration { ty, .. } => match ty {
+                Type::Sum { left, right } => {
+                    assert_eq!(**left, Type::Int);
+                    assert_eq!(**right, Type::Bool);
+                }
+                _ => panic!("Expected Sum type"),
+            },
+            _ => panic!("Expected variable declaration"),
+        }
+    }
 }

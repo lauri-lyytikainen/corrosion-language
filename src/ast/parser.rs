@@ -278,6 +278,9 @@ impl Parser {
             Token::For => self.parse_for_expression(),
             Token::Range => self.parse_range_expression(),
             Token::Fix => self.parse_fix_expression(),
+            Token::Inl => self.parse_inl_expression(),
+            Token::Inr => self.parse_inr_expression(),
+            Token::Case => self.parse_case_expression(),
             Token::LeftParen => self.parse_parenthesized_or_pair_expression(),
             Token::LeftBracket => self.parse_list_expression(),
             token => Err(ParseError::UnexpectedToken {
@@ -449,11 +452,11 @@ impl Parser {
     }
 
     fn parse_function_type(&mut self) -> ParseResult<TypeExpression> {
-        let mut left = self.parse_primary_type()?;
+        let mut left = self.parse_sum_type()?;
 
         while self.peek().token == Token::Arrow {
             self.advance(); // consume '->'
-            let right = self.parse_primary_type()?;
+            let right = self.parse_sum_type()?;
             let span = Span::new(
                 left.span().start,
                 right.span().end,
@@ -463,6 +466,28 @@ impl Parser {
             left = TypeExpression::Function {
                 param: Box::new(left),
                 result: Box::new(right),
+                span,
+            };
+        }
+
+        Ok(left)
+    }
+
+    fn parse_sum_type(&mut self) -> ParseResult<TypeExpression> {
+        let mut left = self.parse_primary_type()?;
+
+        while self.peek().token == Token::Plus {
+            self.advance(); // consume '+'
+            let right = self.parse_primary_type()?;
+            let span = Span::new(
+                left.span().start,
+                right.span().end,
+                left.span().line,
+                left.span().column,
+            );
+            left = TypeExpression::Sum {
+                left: Box::new(left),
+                right: Box::new(right),
                 span,
             };
         }
@@ -816,5 +841,89 @@ impl Parser {
         );
 
         Ok(Expression::Fix { function, span })
+    }
+
+    fn parse_inl_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+        self.consume(Token::LeftParen, "Expected '(' after 'inl'")?;
+        let value = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after inl value")?;
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+        Ok(Expression::LeftInject { value, span })
+    }
+
+    fn parse_inr_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+        self.consume(Token::LeftParen, "Expected '(' after 'inr'")?;
+        let value = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after inr value")?;
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+        Ok(Expression::RightInject { value, span })
+    }
+
+    fn parse_case_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        // case expression of
+        let expression = Box::new(self.parse_expression()?);
+        self.consume(Token::Of, "Expected 'of' after case expression")?;
+
+        // inl x => body
+        self.consume(Token::Inl, "Expected 'inl' in first case branch")?;
+        let left_pattern = if let Token::Identifier(name) = &self.advance().token {
+            name.clone()
+        } else {
+            return Err(ParseError::UnexpectedToken {
+                expected: "identifier".to_string(),
+                found: self.previous().token.clone(),
+                span: self.previous_span(),
+            });
+        };
+        self.consume(Token::FatArrow, "Expected '=>' after pattern")?;
+        let left_body = Box::new(self.parse_expression()?);
+
+        // | inr y => body
+        self.consume(Token::Pipe, "Expected '|' between case branches")?;
+        self.consume(Token::Inr, "Expected 'inr' in second case branch")?;
+        let right_pattern = if let Token::Identifier(name) = &self.advance().token {
+            name.clone()
+        } else {
+            return Err(ParseError::UnexpectedToken {
+                expected: "identifier".to_string(),
+                found: self.previous().token.clone(),
+                span: self.previous_span(),
+            });
+        };
+        self.consume(Token::FatArrow, "Expected '=>' after pattern")?;
+        let right_body = Box::new(self.parse_expression()?);
+
+        let end_span = right_body.span().clone();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::Case {
+            expression,
+            left_pattern,
+            left_body,
+            right_pattern,
+            right_body,
+            span,
+        })
     }
 }

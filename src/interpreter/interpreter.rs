@@ -317,6 +317,38 @@ impl Interpreter {
                 }
             }
 
+            Expression::Case {
+                expression,
+                left_pattern,
+                left_body,
+                right_pattern,
+                right_body,
+                span,
+            } => {
+                let val = self.interpret_expression(expression)?;
+                match val {
+                    Value::LeftInject(inner_val) => {
+                        self.environment.push_scope();
+                        self.environment.bind(left_pattern.clone(), *inner_val);
+                        let result = self.interpret_expression(left_body);
+                        self.environment.pop_scope();
+                        result
+                    }
+                    Value::RightInject(inner_val) => {
+                        self.environment.push_scope();
+                        self.environment.bind(right_pattern.clone(), *inner_val);
+                        let result = self.interpret_expression(right_body);
+                        self.environment.pop_scope();
+                        result
+                    }
+                    _ => Err(InterpreterError::TypeError {
+                        expected: "Sum Type".to_string(),
+                        found: val.type_name().to_string(),
+                        span: span.clone(),
+                    }),
+                }
+            }
+
             Expression::If {
                 condition,
                 then_branch,
