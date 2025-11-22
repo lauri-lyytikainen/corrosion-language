@@ -58,6 +58,11 @@ impl Type {
             (Type::Bool, BinaryOp::Equal, Type::Bool) => Some(Type::Bool),
             (Type::Bool, BinaryOp::NotEqual, Type::Bool) => Some(Type::Bool),
 
+            // String operations
+            (Type::String, BinaryOp::Add, Type::String) => Some(Type::String), // String concatenation
+            (Type::String, BinaryOp::Equal, Type::String) => Some(Type::Bool),
+            (Type::String, BinaryOp::NotEqual, Type::String) => Some(Type::Bool),
+
             // Logical operations on booleans
             (Type::Bool, BinaryOp::LogicalAnd, Type::Bool) => Some(Type::Bool),
             (Type::Bool, BinaryOp::LogicalOr, Type::Bool) => Some(Type::Bool),

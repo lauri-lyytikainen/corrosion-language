@@ -65,6 +65,7 @@ fn parse_identifier_or_keyword(input: &str) -> IResult<&str, Token> {
             "let" => Token::Let,
             "Int" => Token::Int,
             "Bool" => Token::Bool,
+            "String" => Token::String,
             "List" => Token::List,
             "Rec" => Token::Rec,
             "fn" => Token::Fn,
@@ -80,6 +81,10 @@ fn parse_identifier_or_keyword(input: &str) -> IResult<&str, Token> {
             "for" => Token::For,
             "in" => Token::In,
             "range" => Token::Range,
+            "concat" => Token::Concat,
+            "char" => Token::Char,
+            "length" => Token::Length,
+            "toString" => Token::ToString,
             "inl" => Token::Inl,
             "inr" => Token::Inr,
             "case" => Token::Case,
@@ -93,6 +98,50 @@ fn parse_identifier_or_keyword(input: &str) -> IResult<&str, Token> {
 
 fn parse_number(input: &str) -> IResult<&str, Token> {
     digit1.map_res(str::parse).map(Token::Number).parse(input)
+}
+
+fn parse_string_literal(input: &str) -> IResult<&str, Token> {
+    let (input, _) = char('"')(input)?;
+    let mut chars = Vec::new();
+    let mut remaining = input;
+
+    while let Some(first_char) = remaining.chars().next() {
+        if first_char == '"' {
+            let (rest, _) = char('"')(remaining)?;
+            let string_value: String = chars.into_iter().collect();
+            return Ok((rest, Token::StringLiteral(string_value)));
+        } else if first_char == '\\' {
+            // Handle escape sequences
+            let mut char_iter = remaining.chars();
+            char_iter.next(); // consume backslash
+            if let Some(escaped_char) = char_iter.next() {
+                let escaped = match escaped_char {
+                    'n' => '\n',
+                    't' => '\t',
+                    'r' => '\r',
+                    '\\' => '\\',
+                    '"' => '"',
+                    _ => escaped_char, // Default: keep the character as-is
+                };
+                chars.push(escaped);
+                remaining = &remaining[2..]; // consume backslash and escaped char
+            } else {
+                return Err(nom::Err::Error(nom::error::Error::new(
+                    remaining,
+                    nom::error::ErrorKind::Char,
+                )));
+            }
+        } else {
+            chars.push(first_char);
+            remaining = &remaining[first_char.len_utf8()..];
+        }
+    }
+
+    // Unterminated string
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Char,
+    )))
 }
 
 fn parse_assign(input: &str) -> IResult<&str, Token> {
@@ -275,6 +324,7 @@ fn parse_single_token(input: &str) -> IResult<&str, Token> {
         parse_operators,
         parse_identifier_or_keyword,
         parse_number,
+        parse_string_literal,
         parse_punctuation,
     ))
     .parse(input)

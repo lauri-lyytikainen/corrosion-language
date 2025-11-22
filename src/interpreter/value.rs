@@ -5,6 +5,8 @@ pub enum Value {
     Int(i64),
     /// Boolean value
     Bool(bool),
+    /// String value
+    String(String),
     /// Unit value (void)
     Unit,
     /// List of values
@@ -31,6 +33,7 @@ impl Value {
         match self {
             Value::Int(_) => "Int",
             Value::Bool(_) => "Bool",
+            Value::String(_) => "String",
             Value::Unit => "Unit",
             Value::List(_) => "List",
             Value::Pair(_, _) => "Pair",
@@ -47,6 +50,7 @@ impl Value {
             Value::Bool(b) => *b,
             Value::Unit => false,
             Value::Int(n) => *n != 0,
+            Value::String(s) => !s.is_empty(),
             Value::List(list) => !list.is_empty(),
             Value::FixedPoint { .. } => true, // Fixed point functions are truthy
             _ => true,                        // Other values are considered truthy
@@ -68,6 +72,14 @@ impl Value {
             _ => None,
         }
     }
+
+    /// Convert to a string value if possible
+    pub fn to_string(&self) -> Option<&String> {
+        match self {
+            Value::String(s) => Some(s),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Value {
@@ -75,6 +87,7 @@ impl std::fmt::Display for Value {
         match self {
             Value::Int(n) => write!(f, "{}", n),
             Value::Bool(b) => write!(f, "{}", b),
+            Value::String(s) => write!(f, "\"{}\"", s),
             Value::Unit => write!(f, "()"),
             Value::List(elements) => {
                 write!(f, "[")?;

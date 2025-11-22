@@ -4,10 +4,11 @@ pub enum Token {
     Let,
 
     // Type keywords
-    Int,  // Int
-    Bool, // Bool
-    List, // List
-    Rec,  // Rec
+    Int,    // Int
+    Bool,   // Bool
+    String, // String
+    List,   // List
+    Rec,    // Rec
 
     // Function keywords
     Fn,  // fn
@@ -32,6 +33,12 @@ pub enum Token {
     In,    // in (for iteration keyword)
     Range, // range (numeric range generation)
 
+    // String operations
+    Concat,   // concat (string concatenation)
+    Char,     // char (character access)
+    Length,   // length (string length)
+    ToString, // toString (convert to string)
+
     // Sum type constructors
     Inl, // inl (left injection)
     Inr, // inr (right injection)
@@ -49,6 +56,7 @@ pub enum Token {
     // Identifiers and literals
     Identifier(String),
     Number(i64),
+    StringLiteral(String),
 
     // Operators
     Assign,           // =

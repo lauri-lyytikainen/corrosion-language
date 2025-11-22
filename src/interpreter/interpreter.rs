@@ -49,6 +49,8 @@ impl Interpreter {
 
             Expression::Boolean { value, .. } => Ok(Value::Bool(*value)),
 
+            Expression::String { value, .. } => Ok(Value::String(value.clone())),
+
             Expression::Identifier { name, span } => {
                 self.environment.lookup(name).cloned().ok_or_else(|| {
                     InterpreterError::UndefinedVariable {
@@ -317,6 +319,86 @@ impl Interpreter {
                 }
             }
 
+            Expression::Concat { left, right, .. } => {
+                let left_val = self.interpret_expression(left)?;
+                let right_val = self.interpret_expression(right)?;
+
+                match (left_val, right_val) {
+                    (Value::String(s1), Value::String(s2)) => {
+                        Ok(Value::String(format!("{}{}", s1, s2)))
+                    }
+                    (Value::String(_), other) => Err(InterpreterError::TypeError {
+                        expected: "String".to_string(),
+                        found: other.type_name().to_string(),
+                        span: right.span().clone(),
+                    }),
+                    (other, _) => Err(InterpreterError::TypeError {
+                        expected: "String".to_string(),
+                        found: other.type_name().to_string(),
+                        span: left.span().clone(),
+                    }),
+                }
+            }
+
+            Expression::CharAt { string, index, span } => {
+                let string_val = self.interpret_expression(string)?;
+                let index_val = self.interpret_expression(index)?;
+
+                match (string_val, index_val) {
+                    (Value::String(s), Value::Int(i)) => {
+                        if i < 0 {
+                            Err(InterpreterError::RuntimeError {
+                                message: "String index cannot be negative".to_string(),
+                                span: Some(span.clone()),
+                            })
+                        } else {
+                            let chars: Vec<char> = s.chars().collect();
+                            let index = i as usize;
+                            if index < chars.len() {
+                                Ok(Value::String(chars[index].to_string()))
+                            } else {
+                                Err(InterpreterError::RuntimeError {
+                                    message: format!("String index {} out of bounds (length {})", i, chars.len()),
+                                    span: Some(span.clone()),
+                                })
+                            }
+                        }
+                    }
+                    (Value::String(_), other) => Err(InterpreterError::TypeError {
+                        expected: "Int".to_string(),
+                        found: other.type_name().to_string(),
+                        span: index.span().clone(),
+                    }),
+                    (other, _) => Err(InterpreterError::TypeError {
+                        expected: "String".to_string(),
+                        found: other.type_name().to_string(),
+                        span: string.span().clone(),
+                    }),
+                }
+            }
+
+            Expression::Length { string, .. } => {
+                let string_val = self.interpret_expression(string)?;
+
+                match string_val {
+                    Value::String(s) => {
+                        let length = s.chars().count() as i64;
+                        Ok(Value::Int(length))
+                    }
+                    other => Err(InterpreterError::TypeError {
+                        expected: "String".to_string(),
+                        found: other.type_name().to_string(),
+                        span: string.span().clone(),
+                    }),
+                }
+            }
+
+            Expression::ToString { expression, .. } => {
+                let value = self.interpret_expression(expression)?;
+                let string_representation = self.value_to_string(&value);
+                Ok(Value::String(string_representation))
+            }
+
             Expression::Case {
                 expression,
                 left_pattern,
@@ -390,8 +472,9 @@ impl Interpreter {
             // Arithmetic operations
             BinaryOperator::Add => match (&left_val, &right_val) {
                 (Value::Int(l), Value::Int(r)) => Ok(Value::Int(l + r)),
+                (Value::String(l), Value::String(r)) => Ok(Value::String(format!("{}{}", l, r))),
                 _ => Err(InterpreterError::TypeError {
-                    expected: "Int + Int".to_string(),
+                    expected: "Int + Int or String + String".to_string(),
                     found: format!("{} + {}", left_val.type_name(), right_val.type_name()),
                     span: span.clone(),
                 }),
@@ -563,6 +646,30 @@ impl Interpreter {
     /// Get the current environment (for debugging/testing)
     pub fn environment(&self) -> &Environment {
         &self.environment
+    }
+
+    /// Convert a Value to its string representation
+    fn value_to_string(&self, value: &Value) -> String {
+        match value {
+            Value::Int(i) => i.to_string(),
+            Value::Bool(b) => b.to_string(),
+            Value::String(s) => s.clone(),
+            Value::Unit => "()".to_string(),
+            Value::List(elements) => {
+                let element_strings: Vec<String> = elements
+                    .iter()
+                    .map(|elem| self.value_to_string(elem))
+                    .collect();
+                format!("[{}]", element_strings.join(", "))
+            }
+            Value::Pair(first, second) => {
+                format!("({}, {})", self.value_to_string(first), self.value_to_string(second))
+            }
+            Value::Function { .. } => "<function>".to_string(),
+            Value::LeftInject(val) => format!("inl({})", self.value_to_string(val)),
+            Value::RightInject(val) => format!("inr({})", self.value_to_string(val)),
+            Value::FixedPoint { .. } => "<fixed-point>".to_string(),
+        }
     }
 }
 

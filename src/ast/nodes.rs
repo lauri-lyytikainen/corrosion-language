@@ -18,6 +18,9 @@ pub enum TypeExpression {
     Bool {
         span: Span,
     },
+    String {
+        span: Span,
+    },
     List {
         element: Box<TypeExpression>,
         span: Span,
@@ -85,6 +88,10 @@ pub enum Expression {
     },
     Boolean {
         value: bool,
+        span: Span,
+    },
+    String {
+        value: String,
         span: Span,
     },
     BinaryOp {
@@ -187,6 +194,25 @@ pub enum Expression {
         end: Box<Expression>,
         span: Span,
     },
+    // String operations
+    Concat {
+        left: Box<Expression>,
+        right: Box<Expression>,
+        span: Span,
+    },
+    CharAt {
+        string: Box<Expression>,
+        index: Box<Expression>,
+        span: Span,
+    },
+    Length {
+        string: Box<Expression>,
+        span: Span,
+    },
+    ToString {
+        expression: Box<Expression>,
+        span: Span,
+    },
     // Pattern matching
     Case {
         expression: Box<Expression>,
@@ -270,6 +296,7 @@ impl Spanned for Expression {
             Expression::Identifier { span, .. } => span,
             Expression::Number { span, .. } => span,
             Expression::Boolean { span, .. } => span,
+            Expression::String { span, .. } => span,
             Expression::BinaryOp { span, .. } => span,
             Expression::UnaryOp { span, .. } => span,
             Expression::Function { span, .. } => span,
@@ -289,6 +316,10 @@ impl Spanned for Expression {
             Expression::If { span, .. } => span,
             Expression::For { span, .. } => span,
             Expression::Range { span, .. } => span,
+            Expression::Concat { span, .. } => span,
+            Expression::CharAt { span, .. } => span,
+            Expression::Length { span, .. } => span,
+            Expression::ToString { span, .. } => span,
             Expression::Case { span, .. } => span,
         }
     }
@@ -299,6 +330,7 @@ impl Spanned for TypeExpression {
         match self {
             TypeExpression::Int { span } => span,
             TypeExpression::Bool { span } => span,
+            TypeExpression::String { span } => span,
             TypeExpression::List { span, .. } => span,
             TypeExpression::Function { span, .. } => span,
             TypeExpression::Pair { span, .. } => span,

@@ -16,9 +16,10 @@ Welcome to the Corrosion programming language! This tutorial will guide you thro
 10. [Recursion](#recursion)
 11. [Type System](#type-system)
 12. [Output](#output)
-13. [Comments](#comments)
-14. [Error Handling](#error-handling)
-15. [Advanced Topics](#advanced-topics)
+13. [String Operations](#string-operations)
+14. [Comments](#comments)
+15. [Error Handling](#error-handling)
+16. [Advanced Topics](#advanced-topics)
 
 ## Getting Started
 
@@ -690,6 +691,160 @@ print(x + 50);       // Prints: 150
 let numbers = [1, 2, 3];
 print(head(numbers)); // Prints: 1
 print(tail(numbers)); // Prints: [2, 3]
+```
+
+## String Operations
+
+### String Literals
+
+Strings are created using double quotes:
+
+```rust
+let message = "Hello, World!";
+let name = "Corrosion";
+print(message);  // Prints: "Hello, World!"
+```
+
+### String Escape Sequences
+
+Strings support escape sequences for special characters:
+
+```rust
+let multiline = "Line 1\nLine 2";
+let with_tab = "Column 1\tColumn 2";
+let with_quote = "She said: \"Hello!\"";
+let with_backslash = "Path: C:\\Users\\name";
+
+print(multiline);
+// Prints:
+// "Line 1
+// Line 2"
+```
+
+### String Concatenation
+
+Combine strings using the `+` operator:
+
+```rust
+let greeting = "Hello";
+let name = "World";
+let message = greeting + ", " + name + "!";
+print(message);  // Prints: "Hello, World!"
+```
+
+Or use the `concat` function:
+
+```rust
+let result = concat("Hello", " World");
+print(result);  // Prints: "Hello World"
+```
+
+### String Operations
+
+#### Getting String Length
+
+```rust
+let text = "Hello";
+let len = length(text);
+print(len);  // Prints: 5
+```
+
+#### Accessing Characters
+
+```rust
+let text = "Hello";
+let first_char = char(text, 0);  // Get character at index 0
+let last_char = char(text, 4);   // Get character at index 4
+
+print(first_char);  // Prints: "H"
+print(last_char);   // Prints: "o"
+```
+
+### Converting Other Types to Strings
+
+Use the `toString` function to convert any value to its string representation:
+
+```rust
+// Convert numbers
+let num_str = toString(42);
+print("Number: " + num_str);  // Prints: "Number: 42"
+
+// Convert booleans
+let bool_str = toString(true);
+print("Boolean: " + bool_str);  // Prints: "Boolean: true"
+
+// Convert lists
+let list_str = toString([1, 2, 3]);
+print("List: " + list_str);  // Prints: "List: [1, 2, 3]"
+
+// Convert pairs
+let pair_str = toString((10, 20));
+print("Pair: " + pair_str);  // Prints: "Pair: (10, 20)"
+```
+
+### Practical String Examples
+
+#### Building Dynamic Messages
+
+```rust
+let user_name = "Alice";
+let score = 95;
+let passed = score >= 70;
+
+let message = "User " + user_name + " scored " + toString(score) + 
+              " points and " + (if passed { "passed" } else { "failed" });
+
+print(message);
+// Prints: "User Alice scored 95 points and passed"
+```
+
+#### Processing Text Data
+
+```rust
+let words = ["Hello", "beautiful", "world"];
+
+// Build a sentence by concatenating words
+let sentence = words[0] + " " + words[1] + " " + words[2] + "!";
+print(sentence);  // Prints: "Hello beautiful world!"
+
+// Get information about each word
+for word in words {
+    let info = "Word: '" + word + "' has " + toString(length(word)) + " characters";
+    print(info);
+}
+// Prints:
+// "Word: 'Hello' has 5 characters"
+// "Word: 'beautiful' has 9 characters" 
+// "Word: 'world' has 5 characters"
+```
+
+#### Working with Complex Data
+
+```rust
+let person = ("John Doe", 30);
+let hobbies = ["reading", "cycling", "cooking"];
+
+let profile = "Name: " + fst(person) + 
+              ", Age: " + toString(snd(person)) + 
+              ", Hobbies: " + toString(hobbies);
+
+print(profile);
+// Prints: "Name: John Doe, Age: 30, Hobbies: [reading, cycling, cooking]"
+```
+
+### String Type Checking
+
+String operations are type-safe - you can only concatenate strings with strings:
+
+```rust
+// ✅ This works - both operands are strings
+let result = "Hello" + " World";
+
+// ❌ This would cause a type error - mixing string and int
+// let error = "Hello" + 123;
+
+// ✅ This works - convert int to string first
+let correct = "Hello" + toString(123);
 ```
 
 ## Comments

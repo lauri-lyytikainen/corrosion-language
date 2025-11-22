@@ -311,4 +311,180 @@ mod new_features_tests {
             _ => panic!("Expected variable declaration"),
         }
     }
+
+    #[test]
+    fn test_string_literal() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize(r#""Hello World";"#).unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).unwrap();
+
+        // Should have one expression statement with String type
+        assert_eq!(typed_program.statements.len(), 1);
+
+        match &typed_program.statements[0] {
+            crate::typechecker::TypedStatement::Expression { expression, .. } => {
+                assert_eq!(expression.ty, Type::String);
+            }
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_string_concatenation() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize(r#""Hello" + " World";"#).unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).unwrap();
+
+        // Should have one expression statement with String type
+        assert_eq!(typed_program.statements.len(), 1);
+
+        match &typed_program.statements[0] {
+            crate::typechecker::TypedStatement::Expression { expression, .. } => {
+                assert_eq!(expression.ty, Type::String);
+            }
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_string_length() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize(r#"length("Hello");"#).unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).unwrap();
+
+        // Should have one expression statement with Int type
+        assert_eq!(typed_program.statements.len(), 1);
+
+        match &typed_program.statements[0] {
+            crate::typechecker::TypedStatement::Expression { expression, .. } => {
+                assert_eq!(expression.ty, Type::Int);
+            }
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_string_char_at() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize(r#"char("Hello", 0);"#).unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).unwrap();
+
+        // Should have one expression statement with String type
+        assert_eq!(typed_program.statements.len(), 1);
+
+        match &typed_program.statements[0] {
+            crate::typechecker::TypedStatement::Expression { expression, .. } => {
+                assert_eq!(expression.ty, Type::String);
+            }
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_string_concat_function() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize(r#"concat("Hello", " World");"#).unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).unwrap();
+
+        // Should have one expression statement with String type
+        assert_eq!(typed_program.statements.len(), 1);
+
+        match &typed_program.statements[0] {
+            crate::typechecker::TypedStatement::Expression { expression, .. } => {
+                assert_eq!(expression.ty, Type::String);
+            }
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_tostring_int() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("toString(42);").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).unwrap();
+
+        // Should have one expression statement with String type
+        assert_eq!(typed_program.statements.len(), 1);
+
+        match &typed_program.statements[0] {
+            crate::typechecker::TypedStatement::Expression { expression, .. } => {
+                assert_eq!(expression.ty, Type::String);
+            }
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_tostring_bool() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("toString(true);").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).unwrap();
+
+        // Should have one expression statement with String type
+        assert_eq!(typed_program.statements.len(), 1);
+
+        match &typed_program.statements[0] {
+            crate::typechecker::TypedStatement::Expression { expression, .. } => {
+                assert_eq!(expression.ty, Type::String);
+            }
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_tostring_list() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("toString([1, 2, 3]);").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).unwrap();
+
+        // Should have one expression statement with String type
+        assert_eq!(typed_program.statements.len(), 1);
+
+        match &typed_program.statements[0] {
+            crate::typechecker::TypedStatement::Expression { expression, .. } => {
+                assert_eq!(expression.ty, Type::String);
+            }
+            _ => panic!("Expected expression statement"),
+        }
+    }
 }

@@ -179,6 +179,9 @@ impl TypeChecker {
             Expression::Boolean { value: _, span } => {
                 Ok(TypedExpression::new(Type::Bool, span.clone()))
             }
+            Expression::String { value: _, span } => {
+                Ok(TypedExpression::new(Type::String, span.clone()))
+            }
             Expression::Identifier { name, span } => match self.environment.lookup(name) {
                 Some(ty) => Ok(TypedExpression::new(ty.clone(), span.clone())),
                 None => Err(TypeError::UndefinedVariable {
@@ -682,6 +685,89 @@ impl TypeChecker {
                     span.clone(),
                 ))
             }
+            Expression::Concat { left, right, span } => {
+                let left_typed = self.check_expression(left)?;
+                let right_typed = self.check_expression(right)?;
+
+                // Both operands must be strings
+                if left_typed.ty != Type::String {
+                    return Err(TypeError::TypeMismatch {
+                        expected: Type::String,
+                        found: left_typed.ty,
+                        span: span.clone(),
+                    });
+                }
+                if right_typed.ty != Type::String {
+                    return Err(TypeError::TypeMismatch {
+                        expected: Type::String,
+                        found: right_typed.ty,
+                        span: span.clone(),
+                    });
+                }
+
+                Ok(TypedExpression::new(Type::String, span.clone()))
+            }
+            Expression::CharAt {
+                string,
+                index,
+                span,
+            } => {
+                let string_typed = self.check_expression(string)?;
+                let index_typed = self.check_expression(index)?;
+
+                // String must be String type
+                if string_typed.ty != Type::String {
+                    return Err(TypeError::TypeMismatch {
+                        expected: Type::String,
+                        found: string_typed.ty,
+                        span: span.clone(),
+                    });
+                }
+                // Index must be Int
+                if index_typed.ty != Type::Int {
+                    return Err(TypeError::TypeMismatch {
+                        expected: Type::Int,
+                        found: index_typed.ty,
+                        span: span.clone(),
+                    });
+                }
+
+                // Returns a single character as String
+                Ok(TypedExpression::new(Type::String, span.clone()))
+            }
+            Expression::Length { string, span } => {
+                let string_typed = self.check_expression(string)?;
+
+                // String must be String type
+                if string_typed.ty != Type::String {
+                    return Err(TypeError::TypeMismatch {
+                        expected: Type::String,
+                        found: string_typed.ty,
+                        span: span.clone(),
+                    });
+                }
+
+                // Returns length as integer
+                Ok(TypedExpression::new(Type::Int, span.clone()))
+            }
+            Expression::ToString { expression, span } => {
+                let expression_typed = self.check_expression(expression)?;
+
+                // toString can convert any type to string
+                // We accept Int, Bool, String, List, Pair types
+                match &expression_typed.ty {
+                    Type::Int
+                    | Type::Bool
+                    | Type::String
+                    | Type::List { .. }
+                    | Type::Pair { .. }
+                    | Type::Unit => Ok(TypedExpression::new(Type::String, span.clone())),
+                    _ => {
+                        // For now, we'll allow other types but may need to extend this later
+                        Ok(TypedExpression::new(Type::String, span.clone()))
+                    }
+                }
+            }
             Expression::If {
                 condition,
                 then_branch,
@@ -736,6 +822,7 @@ impl TypeChecker {
         match type_expr {
             TypeExpression::Int { .. } => Ok(Type::Int),
             TypeExpression::Bool { .. } => Ok(Type::Bool),
+            TypeExpression::String { .. } => Ok(Type::String),
             TypeExpression::List { element, .. } => {
                 let element_type = self.convert_type_expression(element)?;
                 Ok(Type::List {

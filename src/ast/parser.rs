@@ -263,6 +263,10 @@ impl Parser {
                 let span = self.previous_span();
                 Ok(Expression::Boolean { value: false, span })
             }
+            Token::StringLiteral(value) => {
+                let span = self.previous_span();
+                Ok(Expression::String { value, span })
+            }
             Token::Identifier(name) => {
                 let span = self.previous_span();
                 Ok(Expression::Identifier { name, span })
@@ -277,6 +281,10 @@ impl Parser {
             Token::If => self.parse_if_expression(),
             Token::For => self.parse_for_expression(),
             Token::Range => self.parse_range_expression(),
+            Token::Concat => self.parse_concat_expression(),
+            Token::Char => self.parse_char_at_expression(),
+            Token::Length => self.parse_length_expression(),
+            Token::ToString => self.parse_tostring_expression(),
             Token::Fix => self.parse_fix_expression(),
             Token::Inl => self.parse_inl_expression(),
             Token::Inr => self.parse_inr_expression(),
@@ -505,6 +513,10 @@ impl Parser {
             Token::Bool => {
                 let span = self.previous_span();
                 Ok(TypeExpression::Bool { span })
+            }
+            Token::String => {
+                let span = self.previous_span();
+                Ok(TypeExpression::String { span })
             }
             Token::List => {
                 let start_span = self.previous_span();
@@ -925,5 +937,85 @@ impl Parser {
             right_body,
             span,
         })
+    }
+
+    fn parse_concat_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        self.consume(Token::LeftParen, "Expected '(' after 'concat'")?;
+        let left = Box::new(self.parse_expression()?);
+        self.consume(Token::Comma, "Expected ',' in concat")?;
+        let right = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after concat right")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::Concat { left, right, span })
+    }
+
+    fn parse_char_at_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        self.consume(Token::LeftParen, "Expected '(' after 'char'")?;
+        let string = Box::new(self.parse_expression()?);
+        self.consume(Token::Comma, "Expected ',' in char")?;
+        let index = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after char index")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::CharAt {
+            string,
+            index,
+            span,
+        })
+    }
+
+    fn parse_length_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        self.consume(Token::LeftParen, "Expected '(' after 'length'")?;
+        let string = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after length string")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::Length { string, span })
+    }
+
+    fn parse_tostring_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        self.consume(Token::LeftParen, "Expected '(' after 'toString'")?;
+        let expression = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after toString expression")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::ToString { expression, span })
     }
 }
