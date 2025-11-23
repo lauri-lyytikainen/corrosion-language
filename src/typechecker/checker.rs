@@ -3,6 +3,9 @@ use crate::lexer::tokens::Span;
 use crate::typechecker::{
     BinaryOp, Environment, Type, TypedExpression, TypedProgram, TypedStatement,
 };
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Type checking errors
 #[derive(Debug, Clone)]
@@ -96,6 +99,10 @@ pub type TypeResult<T> = Result<T, TypeError>;
 pub struct TypeChecker {
     environment: Environment,
     errors: Vec<TypeError>,
+    /// Current directory for resolving imports
+    current_directory: PathBuf,
+    /// Cache of loaded modules
+    modules: HashMap<String, HashMap<String, Type>>,
 }
 
 impl TypeChecker {
@@ -104,7 +111,70 @@ impl TypeChecker {
         Self {
             environment: Environment::new(),
             errors: Vec::new(),
+            current_directory: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            modules: HashMap::new(),
         }
+    }
+
+    /// Set the current directory for import resolution
+    pub fn set_current_directory<P: AsRef<Path>>(&mut self, path: P) {
+        self.current_directory = path.as_ref().to_path_buf();
+    }
+
+    /// Load and type-check a module from file
+    fn load_and_check_module(
+        &mut self,
+        path: &str,
+        module_name: &str,
+        span: &Span,
+    ) -> TypeResult<HashMap<String, Type>> {
+        // Resolve the import path relative to current directory
+        let import_path = self.current_directory.join(path);
+
+        // Read the file content
+        let content = fs::read_to_string(&import_path).map_err(|_| TypeError::ImportError {
+            message: format!("Failed to read module file: {}", import_path.display()),
+            path: path.to_string(),
+            span: span.clone(),
+        })?;
+
+        // Parse the file content
+        let mut lexer = crate::lexer::tokenizer::Tokenizer::new("");
+        let tokens = lexer
+            .tokenize(&content)
+            .map_err(|e| TypeError::ImportError {
+                message: format!("Failed to tokenize module {}: {}", module_name, e),
+                path: path.to_string(),
+                span: span.clone(),
+            })?;
+
+        let mut parser = crate::ast::parser::Parser::new(tokens);
+        let program = parser.parse().map_err(|e| TypeError::ImportError {
+            message: format!("Failed to parse module {}: {}", module_name, e),
+            path: path.to_string(),
+            span: span.clone(),
+        })?;
+
+        // Create a new type checker for the module
+        let mut module_checker = TypeChecker::new();
+
+        // Set the module's current directory to the imported file's directory
+        if let Some(parent) = import_path.parent() {
+            module_checker.set_current_directory(parent);
+        }
+
+        // Type-check the module
+        let _typed_program =
+            module_checker
+                .check_program(&program)
+                .map_err(|e| TypeError::ImportError {
+                    message: format!("Failed to type-check module {}: {}", module_name, e),
+                    path: path.to_string(),
+                    span: span.clone(),
+                })?;
+
+        // Extract all top-level bindings as exports
+        Ok(module_checker.environment.get_all_bindings_types())
     }
 
     /// Type check a program and return the typed AST
@@ -290,9 +360,13 @@ impl TypeChecker {
                 })
             }
             Statement::Import { path, alias, span } => {
-                // For now, we'll just record the import without detailed validation
-                // In a full implementation, we'd load and type-check the imported file
-                // TODO: Implement proper file loading and module system
+                let import_name = alias.as_ref().unwrap_or(path);
+
+                // Load and type-check the module
+                let module_exports = self.load_and_check_module(path, import_name, span)?;
+
+                // Store the module's exports for later lookup
+                self.modules.insert(import_name.clone(), module_exports);
 
                 Ok(TypedStatement::Import {
                     path: path.clone(),
@@ -330,13 +404,23 @@ impl TypeChecker {
                 }),
             },
             Expression::QualifiedIdentifier { module, name, span } => {
-                // For now, we'll treat qualified identifiers as undefined
-                // In a full implementation, we'd look up the imported module
-                // TODO: Implement proper module resolution
-                Err(TypeError::UndefinedVariable {
-                    name: format!("{}.{}", module, name),
-                    span: span.clone(),
-                })
+                // Look up the module's exports
+                if let Some(module_exports) = self.modules.get(module) {
+                    if let Some(export_type) = module_exports.get(name) {
+                        Ok(TypedExpression::new(export_type.clone(), span.clone()))
+                    } else {
+                        Err(TypeError::UndefinedVariable {
+                            name: format!("{}.{}", module, name),
+                            span: span.clone(),
+                        })
+                    }
+                } else {
+                    Err(TypeError::ImportError {
+                        message: format!("Module '{}' not found", module),
+                        path: module.clone(),
+                        span: span.clone(),
+                    })
+                }
             }
             Expression::BinaryOp {
                 left,
@@ -397,6 +481,8 @@ impl TypeChecker {
                 let mut function_checker = TypeChecker {
                     environment: Environment::with_parent(self.environment.clone()),
                     errors: Vec::new(),
+                    current_directory: self.current_directory.clone(),
+                    modules: self.modules.clone(),
                 };
 
                 // Bind the parameter in the function's scope
@@ -547,6 +633,8 @@ impl TypeChecker {
                         let mut left_checker = TypeChecker {
                             environment: Environment::with_parent(self.environment.clone()),
                             errors: Vec::new(),
+                            current_directory: self.current_directory.clone(),
+                            modules: self.modules.clone(),
                         };
                         // Handle Unknown type in sum (from inference)
                         let left_type = if **left == Type::Unknown {
@@ -567,6 +655,8 @@ impl TypeChecker {
                         let mut right_checker = TypeChecker {
                             environment: Environment::with_parent(self.environment.clone()),
                             errors: Vec::new(),
+                            current_directory: self.current_directory.clone(),
+                            modules: self.modules.clone(),
                         };
                         let right_type = if **right == Type::Unknown {
                             Type::Unknown
@@ -673,6 +763,8 @@ impl TypeChecker {
                 let mut block_checker = TypeChecker {
                     environment: Environment::with_parent(self.environment.clone()),
                     errors: Vec::new(),
+                    current_directory: self.current_directory.clone(),
+                    modules: self.modules.clone(),
                 };
 
                 // Check all statements in the block
@@ -808,6 +900,8 @@ impl TypeChecker {
                 let mut for_checker = TypeChecker {
                     environment: Environment::with_parent(self.environment.clone()),
                     errors: Vec::new(),
+                    current_directory: self.current_directory.clone(),
+                    modules: self.modules.clone(),
                 };
                 for_checker.environment.bind(variable.clone(), element_type);
                 let _ = for_checker.check_expression(body)?;
