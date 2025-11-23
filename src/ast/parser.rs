@@ -85,6 +85,9 @@ impl Parser {
     fn parse_statement(&mut self) -> ParseResult<Statement> {
         match &self.peek().token {
             Token::Let => self.parse_variable_declaration(),
+            Token::Fn => self.parse_function_declaration(),
+            Token::Const => self.parse_constant_declaration(),
+            Token::Import => self.parse_import_statement(),
             _ => self.parse_expression_statement(),
         }
     }
@@ -129,6 +132,157 @@ impl Parser {
             value,
             span,
         })
+    }
+
+    fn parse_function_declaration(&mut self) -> ParseResult<Statement> {
+        let start_span = self.current_span();
+        self.consume(Token::Fn, "Expected 'fn'")?;
+
+        let name = if let Token::Identifier(name) = &self.advance().token {
+            name.clone()
+        } else {
+            return Err(ParseError::UnexpectedToken {
+                expected: "function name".to_string(),
+                found: self.previous().token.clone(),
+                span: self.previous_span(),
+            });
+        };
+
+        self.consume(Token::LeftParen, "Expected '(' after function name")?;
+
+        let param = if let Token::Identifier(param) = &self.advance().token {
+            param.clone()
+        } else {
+            return Err(ParseError::UnexpectedToken {
+                expected: "parameter name".to_string(),
+                found: self.previous().token.clone(),
+                span: self.previous_span(),
+            });
+        };
+
+        // Optional parameter type annotation
+        let param_type = if self.peek().token == Token::Colon {
+            self.advance(); // consume ':'
+            Some(self.parse_type_expression()?)
+        } else {
+            None
+        };
+
+        self.consume(Token::RightParen, "Expected ')' after parameter")?;
+
+        // Optional return type annotation
+        let return_type = if self.peek().token == Token::Arrow {
+            self.advance(); // consume '->'
+            Some(self.parse_type_expression()?)
+        } else {
+            None
+        };
+
+        self.consume(Token::LeftBrace, "Expected '{' before function body")?;
+        let body = self.parse_block()?;
+        self.consume(Token::RightBrace, "Expected '}' after function body")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Statement::FunctionDeclaration {
+            name,
+            param,
+            param_type,
+            return_type,
+            body,
+            span,
+        })
+    }
+
+    fn parse_constant_declaration(&mut self) -> ParseResult<Statement> {
+        let start_span = self.current_span();
+        self.consume(Token::Const, "Expected 'const'")?;
+
+        let name = if let Token::Identifier(name) = &self.advance().token {
+            name.clone()
+        } else {
+            return Err(ParseError::UnexpectedToken {
+                expected: "constant name".to_string(),
+                found: self.previous().token.clone(),
+                span: self.previous_span(),
+            });
+        };
+
+        // Optional type annotation
+        let type_annotation = if self.peek().token == Token::Colon {
+            self.advance(); // consume ':'
+            Some(self.parse_type_expression()?)
+        } else {
+            None
+        };
+
+        self.consume(Token::Assign, "Expected '='")?;
+        let value = self.parse_expression()?;
+        self.consume(Token::Semicolon, "Expected ';'")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Statement::ConstantDeclaration {
+            name,
+            type_annotation,
+            value,
+            span,
+        })
+    }
+
+    fn parse_import_statement(&mut self) -> ParseResult<Statement> {
+        let start_span = self.current_span();
+        self.consume(Token::Import, "Expected 'import'")?;
+
+        let path = if let Token::StringLiteral(path) = &self.advance().token {
+            path.clone()
+        } else {
+            return Err(ParseError::UnexpectedToken {
+                expected: "import path (string)".to_string(),
+                found: self.previous().token.clone(),
+                span: self.previous_span(),
+            });
+        };
+
+        // Optional alias
+        let alias = if self.peek().token == Token::As {
+            self.advance(); // consume 'as'
+            if let Token::Identifier(alias) = &self.advance().token {
+                Some(alias.clone())
+            } else {
+                return Err(ParseError::UnexpectedToken {
+                    expected: "alias identifier".to_string(),
+                    found: self.previous().token.clone(),
+                    span: self.previous_span(),
+                });
+            }
+        } else {
+            None
+        };
+
+        self.consume(Token::Semicolon, "Expected ';'")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Statement::Import { path, alias, span })
     }
 
     fn parse_expression_statement(&mut self) -> ParseResult<Statement> {
@@ -268,8 +422,37 @@ impl Parser {
                 Ok(Expression::String { value, span })
             }
             Token::Identifier(name) => {
-                let span = self.previous_span();
-                Ok(Expression::Identifier { name, span })
+                let start_span = self.previous_span();
+                // Check for qualified identifier (module.name)
+                if !self.is_at_end() && self.peek().token == Token::Period {
+                    self.advance(); // consume '.'
+                    let member_token = self.advance();
+                    if let Token::Identifier(member) = &member_token.token {
+                        let end_span = member_token.span.clone();
+                        let span = Span::new(
+                            start_span.start,
+                            end_span.end,
+                            start_span.line,
+                            start_span.column,
+                        );
+                        Ok(Expression::QualifiedIdentifier {
+                            module: name,
+                            name: member.clone(),
+                            span,
+                        })
+                    } else {
+                        Err(ParseError::UnexpectedToken {
+                            expected: "member name after '.'".to_string(),
+                            found: self.previous().token.clone(),
+                            span: self.previous_span(),
+                        })
+                    }
+                } else {
+                    Ok(Expression::Identifier {
+                        name,
+                        span: start_span,
+                    })
+                }
             }
             Token::Fn => self.parse_function_expression(),
             Token::Fst => self.parse_first_projection(),
@@ -314,6 +497,14 @@ impl Parser {
             });
         };
 
+        // Optional parameter type annotation
+        let param_type = if self.peek().token == Token::Colon {
+            self.advance(); // consume ':'
+            Some(self.parse_type_expression()?)
+        } else {
+            None
+        };
+
         self.consume(Token::RightParen, "Expected ')' after parameter")?;
         self.consume(Token::LeftBrace, "Expected '{' to start function body")?;
 
@@ -330,7 +521,12 @@ impl Parser {
             start_span.column,
         );
 
-        Ok(Expression::Function { param, body, span })
+        Ok(Expression::Function {
+            param,
+            param_type,
+            body,
+            span,
+        })
     }
 
     fn parse_block(&mut self) -> ParseResult<Expression> {

@@ -70,6 +70,25 @@ pub enum Statement {
         value: Expression,
         span: Span,
     },
+    FunctionDeclaration {
+        name: String,
+        param: String,
+        param_type: Option<TypeExpression>,
+        return_type: Option<TypeExpression>,
+        body: Expression,
+        span: Span,
+    },
+    ConstantDeclaration {
+        name: String,
+        type_annotation: Option<TypeExpression>,
+        value: Expression,
+        span: Span,
+    },
+    Import {
+        path: String,
+        alias: Option<String>, // Optional alias for the imported module
+        span: Span,
+    },
     Expression {
         expression: Expression,
         span: Span,
@@ -79,6 +98,11 @@ pub enum Statement {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Identifier {
+        name: String,
+        span: Span,
+    },
+    QualifiedIdentifier {
+        module: String,
         name: String,
         span: Span,
     },
@@ -108,6 +132,7 @@ pub enum Expression {
     // Function expressions
     Function {
         param: String, // Parameter name
+        param_type: Option<TypeExpression>,
         body: Box<Expression>,
         span: Span,
     },
@@ -285,6 +310,9 @@ impl Spanned for Statement {
     fn span(&self) -> &Span {
         match self {
             Statement::VariableDeclaration { span, .. } => span,
+            Statement::FunctionDeclaration { span, .. } => span,
+            Statement::ConstantDeclaration { span, .. } => span,
+            Statement::Import { span, .. } => span,
             Statement::Expression { span, .. } => span,
         }
     }
@@ -294,6 +322,7 @@ impl Spanned for Expression {
     fn span(&self) -> &Span {
         match self {
             Expression::Identifier { span, .. } => span,
+            Expression::QualifiedIdentifier { span, .. } => span,
             Expression::Number { span, .. } => span,
             Expression::Boolean { span, .. } => span,
             Expression::String { span, .. } => span,

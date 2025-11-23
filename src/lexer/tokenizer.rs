@@ -63,6 +63,10 @@ fn parse_identifier_or_keyword(input: &str) -> IResult<&str, Token> {
     recognize(pair(alpha1, many0(alt((alphanumeric1, tag("_"))))))
         .map(|s: &str| match s {
             "let" => Token::Let,
+            "const" => Token::Const,
+            "import" => Token::Import,
+            "from" => Token::From,
+            "as" => Token::As,
             "Int" => Token::Int,
             "Bool" => Token::Bool,
             "String" => Token::String,
@@ -154,6 +158,10 @@ fn parse_semicolon(input: &str) -> IResult<&str, Token> {
 
 fn parse_colon(input: &str) -> IResult<&str, Token> {
     value(Token::Colon, char(':')).parse(input)
+}
+
+fn parse_period(input: &str) -> IResult<&str, Token> {
+    value(Token::Period, char('.')).parse(input)
 }
 
 fn parse_arrow(input: &str) -> IResult<&str, Token> {
@@ -277,6 +285,7 @@ fn parse_punctuation(input: &str) -> IResult<&str, Token> {
     alt((
         parse_semicolon,
         parse_colon,
+        parse_period,
         parse_left_paren,
         parse_right_paren,
         parse_left_bracket,

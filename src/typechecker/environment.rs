@@ -46,6 +46,19 @@ impl Environment {
     pub fn local_bindings(&self) -> &HashMap<String, Type> {
         &self.bindings
     }
+
+    /// Enter a new scope (create a new environment with current as parent)
+    pub fn enter_scope(&mut self) {
+        let current = std::mem::replace(self, Self::new());
+        *self = Self::with_parent(current);
+    }
+
+    /// Exit current scope (restore parent environment)
+    pub fn exit_scope(&mut self) {
+        if let Some(parent) = self.parent.take() {
+            *self = *parent;
+        }
+    }
 }
 
 impl Default for Environment {

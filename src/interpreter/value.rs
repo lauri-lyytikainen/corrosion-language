@@ -25,6 +25,11 @@ pub enum Value {
     RightInject(Box<Value>),
     /// Fixed point value for recursive functions
     FixedPoint { function: Box<Value> },
+    /// Module value for imports
+    Module {
+        name: String,
+        exports: std::collections::HashMap<String, Value>,
+    },
 }
 
 impl Value {
@@ -41,6 +46,7 @@ impl Value {
             Value::LeftInject(_) => "LeftInject",
             Value::RightInject(_) => "RightInject",
             Value::FixedPoint { .. } => "FixedPoint",
+            Value::Module { .. } => "Module",
         }
     }
 
@@ -113,6 +119,9 @@ impl std::fmt::Display for Value {
             }
             Value::FixedPoint { .. } => {
                 write!(f, "<recursive function>")
+            }
+            Value::Module { name, .. } => {
+                write!(f, "<module {}>", name)
             }
         }
     }

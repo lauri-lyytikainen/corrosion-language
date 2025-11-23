@@ -176,6 +176,7 @@ mod tests {
         // Create function: fn(x) { x + 1 }
         let function_expr = Expression::Function {
             param: "x".to_string(),
+            param_type: None,
             body: Box::new(Expression::BinaryOp {
                 left: Box::new(Expression::Identifier {
                     name: "x".to_string(),
@@ -712,6 +713,7 @@ mod tests {
         // Create a function with a multiline body: fn(x) { print(x); x + 10 }
         let multiline_func = Expression::Function {
             param: "x".to_string(),
+            param_type: None,
             body: Box::new(Expression::Block {
                 statements: vec![
                     Statement::Expression {

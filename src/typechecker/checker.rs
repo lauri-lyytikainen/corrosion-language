@@ -26,6 +26,11 @@ pub enum TypeError {
         name: String,
         span: Span,
     },
+    ImportError {
+        path: String,
+        message: String,
+        span: Span,
+    },
 }
 
 impl std::fmt::Display for TypeError {
@@ -66,6 +71,17 @@ impl std::fmt::Display for TypeError {
                     f,
                     "Variable '{}' redefined at line {}, column {}",
                     name, span.line, span.column
+                )
+            }
+            TypeError::ImportError {
+                path,
+                message,
+                span,
+            } => {
+                write!(
+                    f,
+                    "Import error at line {}, column {}: {} (path: {})",
+                    span.line, span.column, message, path
                 )
             }
         }
@@ -160,6 +176,130 @@ impl TypeChecker {
                     span: span.clone(),
                 })
             }
+            Statement::FunctionDeclaration {
+                name,
+                param,
+                param_type,
+                return_type,
+                body,
+                span,
+            } => {
+                // Check if function is already defined in current scope
+                if self.environment.is_bound_locally(name) {
+                    return Err(TypeError::RedefinedVariable {
+                        name: name.clone(),
+                        span: span.clone(),
+                    });
+                }
+
+                // Create a new scope for the function body
+                self.environment.enter_scope();
+
+                // If there's a return type annotation, use it; otherwise infer
+                let expected_return_type = return_type
+                    .as_ref()
+                    .map(|rt| self.convert_type_expression(rt))
+                    .transpose()?;
+
+                // Use explicit parameter type if provided, otherwise Unknown for inference
+                let param_type = if let Some(param_type_expr) = param_type {
+                    self.convert_type_expression(param_type_expr)?
+                } else {
+                    Type::Unknown
+                };
+                self.environment.bind(param.clone(), param_type.clone());
+
+                // Type check the function body
+                let typed_body = self.check_expression(body)?;
+                let actual_return_type = typed_body.ty.clone();
+
+                // Check return type matches annotation if provided
+                let final_return_type = if let Some(expected) = expected_return_type {
+                    if !self.types_compatible(&expected, &actual_return_type) {
+                        self.environment.exit_scope();
+                        return Err(TypeError::TypeMismatch {
+                            expected,
+                            found: actual_return_type,
+                            span: span.clone(),
+                        });
+                    }
+                    expected
+                } else {
+                    actual_return_type
+                };
+
+                self.environment.exit_scope();
+
+                // Create function type
+                let function_type = Type::function(param_type.clone(), final_return_type.clone());
+
+                // Bind the function name to its type
+                self.environment.bind(name.clone(), function_type);
+
+                Ok(TypedStatement::FunctionDeclaration {
+                    name: name.clone(),
+                    param: param.clone(),
+                    param_type,
+                    return_type: final_return_type,
+                    body: typed_body,
+                    span: span.clone(),
+                })
+            }
+            Statement::ConstantDeclaration {
+                name,
+                type_annotation,
+                value,
+                span,
+            } => {
+                // Check if constant is already defined in current scope
+                if self.environment.is_bound_locally(name) {
+                    return Err(TypeError::RedefinedVariable {
+                        name: name.clone(),
+                        span: span.clone(),
+                    });
+                }
+
+                // Type check the value expression
+                let typed_value = self.check_expression(value)?;
+                let inferred_type = typed_value.ty.clone();
+
+                // If there's a type annotation, check it matches the inferred type
+                let final_type = if let Some(annotation) = type_annotation {
+                    let annotated_type = self.convert_type_expression(annotation)?;
+
+                    if !self.types_compatible(&annotated_type, &inferred_type) {
+                        return Err(TypeError::TypeMismatch {
+                            expected: annotated_type,
+                            found: inferred_type,
+                            span: span.clone(),
+                        });
+                    }
+                    annotated_type
+                } else {
+                    inferred_type
+                };
+
+                // Bind the constant to its type
+                self.environment.bind(name.clone(), final_type.clone());
+
+                Ok(TypedStatement::ConstantDeclaration {
+                    name: name.clone(),
+                    ty: final_type,
+                    value: typed_value,
+                    span: span.clone(),
+                })
+            }
+            Statement::Import { path, alias, span } => {
+                // For now, we'll just record the import without detailed validation
+                // In a full implementation, we'd load and type-check the imported file
+                // TODO: Implement proper file loading and module system
+
+                Ok(TypedStatement::Import {
+                    path: path.clone(),
+                    alias: alias.clone(),
+                    span: span.clone(),
+                })
+            }
             Statement::Expression { expression, span } => {
                 let typed_expr = self.check_expression(expression)?;
                 Ok(TypedStatement::Expression {
@@ -189,6 +329,15 @@ impl TypeChecker {
                     span: span.clone(),
                 }),
             },
+            Expression::QualifiedIdentifier { module, name, span } => {
+                // For now, we'll treat qualified identifiers as undefined
+                // In a full implementation, we'd look up the imported module
+                // TODO: Implement proper module resolution
+                Err(TypeError::UndefinedVariable {
+                    name: format!("{}.{}", module, name),
+                    span: span.clone(),
+                })
+            }
             Expression::BinaryOp {
                 left,
                 operator,
@@ -231,9 +380,18 @@ impl TypeChecker {
                     }
                 }
             }
-            Expression::Function { param, body, span } => {
-                // Use type inference to determine parameter type
-                let param_type = self.infer_parameter_type(param, body)?;
+            Expression::Function {
+                param,
+                param_type,
+                body,
+                span,
+            } => {
+                // Use explicit parameter type if provided, otherwise infer
+                let param_type = if let Some(param_type_expr) = param_type {
+                    self.convert_type_expression(param_type_expr)?
+                } else {
+                    self.infer_parameter_type(param, body)?
+                };
 
                 // Create a new type checker with a child environment for the function scope
                 let mut function_checker = TypeChecker {
@@ -1356,6 +1514,13 @@ impl TypeChecker {
             Statement::VariableDeclaration { value, .. } => {
                 self.expression_uses_parameter(param, value)
             }
+            Statement::FunctionDeclaration { body, .. } => {
+                self.expression_uses_parameter(param, body)
+            }
+            Statement::ConstantDeclaration { value, .. } => {
+                self.expression_uses_parameter(param, value)
+            }
+            Statement::Import { .. } => false,
             Statement::Expression { expression, .. } => {
                 self.expression_uses_parameter(param, expression)
             }
@@ -1368,6 +1533,13 @@ impl TypeChecker {
             Statement::VariableDeclaration { value, .. } => {
                 self.analyze_parameter_usage(param, value)
             }
+            Statement::FunctionDeclaration { body, .. } => {
+                self.analyze_parameter_usage(param, body)
+            }
+            Statement::ConstantDeclaration { value, .. } => {
+                self.analyze_parameter_usage(param, value)
+            }
+            Statement::Import { .. } => None,
             Statement::Expression { expression, .. } => {
                 self.analyze_parameter_usage(param, expression)
             }

@@ -153,10 +153,15 @@ let result2 = (2 + 3) * 4;  // 20
 
 ### Function Definition
 
-Functions are defined using the `fn` keyword:
+Functions are defined using the `fn` keyword. You can optionally specify parameter types for better type safety and documentation:
 
 ```rust
+// Without type annotations (uses type inference)
 let add_one = fn(x) { x + 1 };
+
+// With explicit parameter types
+let add_numbers = fn(x: Int, y: Int) { x + y };
+let greet = fn(name: String) { concat("Hello, ", name) };
 ```
 
 ### Function Calls
@@ -184,13 +189,34 @@ print(result);  // Prints: 7
 
 ### Closures
 
-Functions capture variables from their environment:
+Functions capture variables from their environment. Parameter types can be specified:
 
 ```rust
 let multiplier = 3;
-let multiply_by_three = fn(x) { x * multiplier };
+let multiply_by_three = fn(x: Int) { x * multiplier };
 let result = multiply_by_three(4);
 print(result);  // Prints: 12
+
+// Closures with multiple typed parameters
+let calculate = fn(base: Int, factor: Int) { base * multiplier + factor };
+```
+
+### When to Use Parameter Typing
+
+Parameter typing is optional in Corrosion, but it's recommended in these situations:
+
+- **Documentation**: Makes function interfaces clear to other developers
+- **Type Safety**: Catches type errors early during compilation
+- **Complex Functions**: When parameter types aren't obvious from context
+- **API Boundaries**: For functions that will be called from multiple places
+
+```rust
+// Good candidates for explicit typing
+fn validate_input(data: String) { /* validation logic */ }
+fn process_numbers(values: List Int) { /* processing */ }
+
+// Type inference works well for simple cases
+let double = fn(x) { x * 2 };  // Type is inferred as Int -> Int
 ```
 
 ## Data Structures
@@ -346,17 +372,7 @@ if x > 0 {
 };
 ```
 
-2. **Type consistency**: When used as expressions, both branches must return the same type:
-
-```rust
-// Valid - both branches return Int
-let value = if condition { 42 } else { 0 };
-
-// Invalid - mixed types
-// let bad = if condition { 42 } else { true };
-```
-
-3. **Unit type for statements**: If expressions without else must return Unit:
+2. **Unit type for statements**: If expressions without else must return Unit:
 
 ```rust
 // Valid - statement form
@@ -791,7 +807,7 @@ let user_name = "Alice";
 let score = 95;
 let passed = score >= 70;
 
-let message = "User " + user_name + " scored " + toString(score) + 
+let message = "User " + user_name + " scored " + toString(score) +
               " points and " + (if passed { "passed" } else { "failed" });
 
 print(message);
@@ -814,7 +830,7 @@ for word in words {
 }
 // Prints:
 // "Word: 'Hello' has 5 characters"
-// "Word: 'beautiful' has 9 characters" 
+// "Word: 'beautiful' has 9 characters"
 // "Word: 'world' has 5 characters"
 ```
 
@@ -824,8 +840,8 @@ for word in words {
 let person = ("John Doe", 30);
 let hobbies = ["reading", "cycling", "cooking"];
 
-let profile = "Name: " + fst(person) + 
-              ", Age: " + toString(snd(person)) + 
+let profile = "Name: " + fst(person) +
+              ", Age: " + toString(snd(person)) +
               ", Hobbies: " + toString(hobbies);
 
 print(profile);

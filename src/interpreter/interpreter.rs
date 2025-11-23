@@ -38,6 +38,38 @@ impl Interpreter {
                 self.environment.bind(name.clone(), val);
                 Ok(Value::Unit)
             }
+            Statement::FunctionDeclaration {
+                name, param, body, ..
+            } => {
+                // Create a function value and bind it to the name
+                let function_val = Value::Function {
+                    param: param.clone(),
+                    body: Box::new(body.clone()),
+                    env: self.environment.clone(),
+                };
+                self.environment.bind(name.clone(), function_val);
+                Ok(Value::Unit)
+            }
+            Statement::ConstantDeclaration { name, value, .. } => {
+                // Constants are treated the same as variables in the interpreter
+                let val = self.interpret_expression(value)?;
+                self.environment.bind(name.clone(), val);
+                Ok(Value::Unit)
+            }
+            Statement::Import { path, alias, span: _ } => {
+                // For now, we'll just store import information without actual file loading
+                // TODO: Implement actual file loading and module system
+                let import_name = alias.as_ref().unwrap_or(path);
+                
+                // Create a placeholder module value
+                let module_val = Value::Module {
+                    name: import_name.clone(),
+                    exports: std::collections::HashMap::new(),
+                };
+                
+                self.environment.bind(import_name.clone(), module_val);
+                Ok(Value::Unit)
+            }
             Statement::Expression { expression, .. } => self.interpret_expression(expression),
         }
     }
@@ -58,6 +90,32 @@ impl Interpreter {
                         span: span.clone(),
                     }
                 })
+            }
+
+            Expression::QualifiedIdentifier { module, name, span } => {
+                // Look up the module first
+                if let Some(module_val) = self.environment.lookup(module) {
+                    if let Value::Module { exports, .. } = module_val {
+                        // Look up the name in the module's exports
+                        exports.get(name).cloned().ok_or_else(|| {
+                            InterpreterError::UndefinedVariable {
+                                name: format!("{}.{}", module, name),
+                                span: span.clone(),
+                            }
+                        })
+                    } else {
+                        Err(InterpreterError::TypeError {
+                            expected: "Module".to_string(),
+                            found: module_val.type_name().to_string(),
+                            span: span.clone(),
+                        })
+                    }
+                } else {
+                    Err(InterpreterError::UndefinedVariable {
+                        name: module.clone(),
+                        span: span.clone(),
+                    })
+                }
             }
 
             Expression::List { elements, .. } => {
@@ -669,6 +727,7 @@ impl Interpreter {
             Value::LeftInject(val) => format!("inl({})", self.value_to_string(val)),
             Value::RightInject(val) => format!("inr({})", self.value_to_string(val)),
             Value::FixedPoint { .. } => "<fixed-point>".to_string(),
+            Value::Module { name, .. } => format!("<module {}>", name),
         }
     }
 }

@@ -2,6 +2,9 @@
 pub enum Token {
     // Keywords
     Let,
+    Const,  // const (constant declaration)
+    Import, // import (file import)
+    From,   // from (import source)
 
     // Type keywords
     Int,    // Int
@@ -48,6 +51,7 @@ pub enum Token {
     Of,       // of
     Pipe,     // |
     FatArrow, // =>
+    As,       // as (import aliasing)
 
     // Boolean literals
     True,  // true
@@ -78,6 +82,7 @@ pub enum Token {
     // Punctuation
     Semicolon,    // ;
     Colon,        // :
+    Period,       // .
     LeftParen,    // (
     RightParen,   // )
     LeftBracket,  // [

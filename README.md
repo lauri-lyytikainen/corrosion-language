@@ -121,15 +121,21 @@ Immutable tuples for combining two values:
 
 #### Functions
 
-First-class functions with lexical scoping:
+First-class functions with lexical scoping and optional parameter typing:
 
-- Definition: `fn(x) { x + 1 }`
+- Anonymous: `fn(x) { x + 1 }` or `fn(x: Int) { x + 1 }`
+- Named: `fn increment(x: Int) { x + 1 }`
 - Higher-order functions supported
 - Closures capture their environment
 
 ### Syntax Highlights
 
 - **Variables**: `let name = value;`
+- **Named Functions**: `fn name(param: Type) -> Type { body }`
+- **Anonymous Functions**: `fn(param: Type) { body }`
+- **Constants**: `const NAME: Type = value;`
+- **Imports**: `import "module.corr" as alias;`
+- **Qualified Access**: `module.member`
 - **Type Annotations**: `let x: Int = 42;`
 - **Function Calls**: `function(argument)`
 - **Conditionals**: `if condition { ... } else { ... }`

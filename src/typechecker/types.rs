@@ -168,6 +168,25 @@ pub enum TypedStatement {
         value: TypedExpression,
         span: Span,
     },
+    FunctionDeclaration {
+        name: String,
+        param: String,
+        param_type: Type,
+        return_type: Type,
+        body: TypedExpression,
+        span: Span,
+    },
+    ConstantDeclaration {
+        name: String,
+        ty: Type,
+        value: TypedExpression,
+        span: Span,
+    },
+    Import {
+        path: String,
+        alias: Option<String>,
+        span: Span,
+    },
     Expression {
         expression: TypedExpression,
         span: Span,
