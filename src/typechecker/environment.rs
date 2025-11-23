@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::typechecker::Type;
+use std::collections::HashMap;
 
 /// Type environment for variable bindings
 #[derive(Debug, Clone)]
@@ -32,9 +32,9 @@ impl Environment {
 
     /// Look up a variable type, searching parent scopes if necessary
     pub fn lookup(&self, name: &str) -> Option<&Type> {
-        self.bindings.get(name).or_else(|| {
-            self.parent.as_ref().and_then(|parent| parent.lookup(name))
-        })
+        self.bindings
+            .get(name)
+            .or_else(|| self.parent.as_ref().and_then(|parent| parent.lookup(name)))
     }
 
     /// Check if a variable is bound in the current scope (not parent scopes)
@@ -45,6 +45,21 @@ impl Environment {
     /// Get all bindings in the current scope
     pub fn local_bindings(&self) -> &HashMap<String, Type> {
         &self.bindings
+    }
+
+    /// Get all bindings from all scopes (for module exports)
+    pub fn get_all_bindings_types(&self) -> HashMap<String, Type> {
+        let mut all_bindings = HashMap::new();
+
+        // Start with parent bindings (lower precedence)
+        if let Some(parent) = &self.parent {
+            all_bindings.extend(parent.get_all_bindings_types());
+        }
+
+        // Override with current scope bindings (higher precedence)
+        all_bindings.extend(self.bindings.clone());
+
+        all_bindings
     }
 
     /// Enter a new scope (create a new environment with current as parent)

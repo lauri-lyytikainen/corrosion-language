@@ -1,11 +1,15 @@
 use super::{Environment, InterpreterError, InterpreterResult, Value};
 use crate::ast::nodes::{BinaryOperator, Expression, Program, Spanned, Statement};
 use crate::lexer::tokens::Span;
+use std::path::{Path, PathBuf};
+use std::fs;
 
 /// Interpreter for the Corrosion language
 pub struct Interpreter {
     /// Current environment for variable bindings
     environment: Environment,
+    /// Current directory for resolving imports
+    current_directory: PathBuf,
 }
 
 impl Interpreter {
@@ -13,12 +17,21 @@ impl Interpreter {
     pub fn new() -> Self {
         Self {
             environment: Environment::new(),
+            current_directory: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         }
     }
 
     /// Create a new interpreter with a given environment
     pub fn with_environment(environment: Environment) -> Self {
-        Self { environment }
+        Self { 
+            environment,
+            current_directory: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        }
+    }
+
+    /// Set the current directory for import resolution
+    pub fn set_current_directory<P: AsRef<Path>>(&mut self, path: P) {
+        self.current_directory = path.as_ref().to_path_buf();
     }
 
     /// Interpret a program and return the result
@@ -56,22 +69,72 @@ impl Interpreter {
                 self.environment.bind(name.clone(), val);
                 Ok(Value::Unit)
             }
-            Statement::Import { path, alias, span: _ } => {
-                // For now, we'll just store import information without actual file loading
-                // TODO: Implement actual file loading and module system
+            Statement::Import { path, alias, span } => {
                 let import_name = alias.as_ref().unwrap_or(path);
                 
-                // Create a placeholder module value
-                let module_val = Value::Module {
-                    name: import_name.clone(),
-                    exports: std::collections::HashMap::new(),
-                };
+                // Resolve the import path relative to current directory
+                let import_path = self.current_directory.join(path);
+                
+                // Load and execute the imported file
+                let module_val = self.load_module(&import_path, import_name, span)?;
                 
                 self.environment.bind(import_name.clone(), module_val);
                 Ok(Value::Unit)
             }
             Statement::Expression { expression, .. } => self.interpret_expression(expression),
         }
+    }
+
+    /// Load and execute a module from file
+    fn load_module(&mut self, path: &Path, module_name: &str, span: &Span) -> InterpreterResult<Value> {
+        // Read the file content
+        let content = fs::read_to_string(path).map_err(|_| {
+            InterpreterError::RuntimeError {
+                message: format!("Failed to read module file: {}", path.display()),
+                span: Some(span.clone()),
+            }
+        })?;
+
+        // Parse the file content
+        let mut lexer = crate::lexer::tokenizer::Tokenizer::new("");
+        let tokens = lexer.tokenize(&content).map_err(|e| {
+            InterpreterError::RuntimeError {
+                message: format!("Failed to tokenize module {}: {}", module_name, e),
+                span: Some(span.clone()),
+            }
+        })?;
+
+        let mut parser = crate::ast::parser::Parser::new(tokens);
+        let program = parser.parse().map_err(|e| {
+            InterpreterError::RuntimeError {
+                message: format!("Failed to parse module {}: {}", module_name, e),
+                span: Some(span.clone()),
+            }
+        })?;
+
+        // Create a new environment for the module to execute in isolation
+        let mut module_interpreter = Interpreter::new();
+        
+        // Set the module's current directory to the imported file's directory
+        if let Some(parent) = path.parent() {
+            module_interpreter.set_current_directory(parent);
+        }
+
+        // Execute the module
+        module_interpreter.interpret_program(&program).map_err(|e| {
+            InterpreterError::RuntimeError {
+                message: format!("Failed to execute module {}: {}", module_name, e),
+                span: Some(span.clone()),
+            }
+        })?;
+
+        // Extract all top-level bindings as exports
+        let exports = module_interpreter.environment.get_all_bindings();
+
+        Ok(Value::Module {
+            name: module_name.to_string(),
+            exports,
+        })
     }
 
     /// Interpret an expression and return its value

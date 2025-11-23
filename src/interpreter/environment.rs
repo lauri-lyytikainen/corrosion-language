@@ -43,6 +43,16 @@ impl Environment {
         }
     }
 
+    /// Get all bindings from the current environment (for module exports)
+    pub fn get_all_bindings(&self) -> HashMap<String, Value> {
+        let mut all_bindings = HashMap::new();
+        // Collect all bindings from all scopes, with later scopes overriding earlier ones
+        for scope in &self.scopes {
+            all_bindings.extend(scope.clone());
+        }
+        all_bindings
+    }
+
     /// Look up a variable in the environment
     /// Searches from the most recent scope backwards to the global scope
     pub fn lookup(&self, name: &str) -> Option<&Value> {
