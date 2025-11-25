@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod new_features_tests {
     use crate::ast::Parser;
+    use crate::interpreter::{Interpreter, Value};
     use crate::lexer::Tokenizer;
     use crate::typechecker::Type;
     use crate::typechecker::TypeChecker;
@@ -486,5 +487,178 @@ mod new_features_tests {
             }
             _ => panic!("Expected expression statement"),
         }
+    }
+
+    #[test]
+    fn test_type_expression_int() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("type(42);").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut type_checker = TypeChecker::new();
+        let typed_program = type_checker.check_program(&program).unwrap();
+
+        // Should have one expression statement with String type
+        assert_eq!(typed_program.statements.len(), 1);
+
+        match &typed_program.statements[0] {
+            crate::typechecker::TypedStatement::Expression { expression, .. } => {
+                assert_eq!(expression.ty, Type::String);
+            }
+            _ => panic!("Expected expression statement"),
+        }
+
+        // Test runtime evaluation
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.interpret_program_repl(&program).unwrap();
+        assert_eq!(result, Value::String("Int".to_string()));
+    }
+
+    #[test]
+    fn test_type_expression_string() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("type(\"hello\");").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.interpret_program_repl(&program).unwrap();
+        assert_eq!(result, Value::String("String".to_string()));
+    }
+
+    #[test]
+    fn test_type_expression_bool() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("type(true);").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.interpret_program_repl(&program).unwrap();
+        assert_eq!(result, Value::String("Bool".to_string()));
+    }
+
+    #[test]
+    fn test_type_expression_list() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("type([1, 2, 3]);").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.interpret_program_repl(&program).unwrap();
+        assert_eq!(result, Value::String("List Int".to_string()));
+    }
+
+    #[test]
+    fn test_type_expression_empty_list() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("type([]);").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.interpret_program_repl(&program).unwrap();
+        assert_eq!(result, Value::String("List Unknown".to_string()));
+    }
+
+    #[test]
+    fn test_type_expression_pair() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("type((42, true));").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.interpret_program_repl(&program).unwrap();
+        assert_eq!(result, Value::String("(Int, Bool)".to_string()));
+    }
+
+    #[test]
+    fn test_type_expression_nested_list() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("type([[1, 2], [3, 4]]);").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.interpret_program_repl(&program).unwrap();
+        assert_eq!(result, Value::String("List List Int".to_string()));
+    }
+
+    #[test]
+    fn test_type_expression_unit() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("type(print(42));").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.interpret_program_repl(&program).unwrap();
+        assert_eq!(result, Value::String("Unit".to_string()));
+    }
+
+    #[test]
+    fn test_type_expression_function_arithmetic() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("type(fn(x) { x + 1 });").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.interpret_program_repl(&program).unwrap();
+        assert_eq!(result, Value::String("Int -> Int".to_string()));
+    }
+
+    #[test]
+    fn test_type_expression_function_comparison() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("type(fn(x) { x == 42 });").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.interpret_program_repl(&program).unwrap();
+        assert_eq!(result, Value::String("Int -> Bool".to_string()));
+    }
+
+    #[test]
+    fn test_type_expression_function_pair_access() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("type(fn(p) { fst(p) });").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.interpret_program_repl(&program).unwrap();
+        assert_eq!(
+            result,
+            Value::String("(Unknown, Unknown) -> Unknown".to_string())
+        );
+    }
+
+    #[test]
+    fn test_type_expression_function_list_access() {
+        let mut tokenizer = Tokenizer::new("");
+        let tokens = tokenizer.tokenize("type(fn(lst) { head(lst) });").unwrap();
+
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse().unwrap();
+
+        let mut interpreter = Interpreter::new();
+        let result = interpreter.interpret_program_repl(&program).unwrap();
+        assert_eq!(result, Value::String("List Unknown -> Unknown".to_string()));
     }
 }

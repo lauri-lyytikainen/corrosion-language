@@ -43,6 +43,17 @@ impl Interpreter {
         Ok(Value::Unit)
     }
 
+    /// Interpret a program for REPL use, returning the result of the last expression
+    pub fn interpret_program_repl(&mut self, program: &Program) -> InterpreterResult<Value> {
+        let mut last_result = Value::Unit;
+
+        for statement in &program.statements {
+            last_result = self.interpret_statement(statement)?;
+        }
+
+        Ok(last_result)
+    }
+
     /// Interpret a single statement
     pub fn interpret_statement(&mut self, statement: &Statement) -> InterpreterResult<Value> {
         match statement {
@@ -523,6 +534,12 @@ impl Interpreter {
                 Ok(Value::String(string_representation))
             }
 
+            Expression::TypeOf { expression, .. } => {
+                let value = self.interpret_expression(expression)?;
+                let type_string = self.value_to_type_string(&value);
+                Ok(Value::String(type_string))
+            }
+
             Expression::Case {
                 expression,
                 left_pattern,
@@ -798,6 +815,267 @@ impl Interpreter {
             Value::RightInject(val) => format!("inr({})", self.value_to_string(val)),
             Value::FixedPoint { .. } => "<fixed-point>".to_string(),
             Value::Module { name, .. } => format!("<module {}>", name),
+        }
+    }
+
+    /// Convert a Value to its type representation as a string
+    fn value_to_type_string(&self, value: &Value) -> String {
+        match value {
+            Value::Int(_) => "Int".to_string(),
+            Value::Bool(_) => "Bool".to_string(),
+            Value::String(_) => "String".to_string(),
+            Value::Unit => "Unit".to_string(),
+            Value::List(elements) => {
+                if elements.is_empty() {
+                    "List Unknown".to_string()
+                } else {
+                    // For simplicity, assume all elements have the same type as the first
+                    let element_type = self.value_to_type_string(&elements[0]);
+                    format!("List {}", element_type)
+                }
+            }
+            Value::Pair(first, second) => {
+                let first_type = self.value_to_type_string(first);
+                let second_type = self.value_to_type_string(second);
+                format!("({}, {})", first_type, second_type)
+            }
+            Value::Function { param, body, .. } => {
+                // Try to infer function type from parameter name and body analysis
+                self.infer_function_type_string(param, body)
+            }
+            Value::LeftInject(val) => {
+                let inner_type = self.value_to_type_string(val);
+                format!("({} + Unknown)", inner_type)
+            }
+            Value::RightInject(val) => {
+                let inner_type = self.value_to_type_string(val);
+                format!("(Unknown + {})", inner_type)
+            }
+            Value::FixedPoint { .. } => "FixedPoint".to_string(),
+            Value::Module { .. } => "Module".to_string(),
+        }
+    }
+
+    /// Try to infer function type signature from the function body
+    fn infer_function_type_string(&self, param: &str, body: &Expression) -> String {
+        // Try to infer the return type from the function body
+        let return_type = self.infer_expression_type_string(body, param);
+
+        // Try to infer the parameter type based on how it's used
+        let param_type = self.infer_parameter_type_from_usage(param, body);
+
+        format!("{} -> {}", param_type, return_type)
+    }
+
+    /// Infer the type of an expression for type string generation
+    fn infer_expression_type_string(&self, expr: &Expression, param: &str) -> String {
+        match expr {
+            Expression::Block { expression, .. } => {
+                // Handle block expressions - recurse into the inner expression
+                if let Some(expr) = expression {
+                    self.infer_expression_type_string(expr, param)
+                } else {
+                    "Unit".to_string()
+                }
+            }
+            Expression::Number { .. } => "Int".to_string(),
+            Expression::Boolean { .. } => "Bool".to_string(),
+            Expression::String { .. } => "String".to_string(),
+            Expression::Identifier { name, .. } => {
+                if name == param {
+                    "Unknown".to_string() // We don't know the parameter type yet
+                } else {
+                    // Try to look up in environment
+                    "Unknown".to_string()
+                }
+            }
+            Expression::BinaryOp {
+                left,
+                right,
+                operator,
+                ..
+            } => {
+                use crate::ast::nodes::BinaryOperator;
+                match operator {
+                    BinaryOperator::Add
+                    | BinaryOperator::Subtract
+                    | BinaryOperator::Multiply
+                    | BinaryOperator::Divide => "Int".to_string(),
+                    BinaryOperator::Equal
+                    | BinaryOperator::NotEqual
+                    | BinaryOperator::LessThan
+                    | BinaryOperator::LessThanEqual
+                    | BinaryOperator::GreaterThan
+                    | BinaryOperator::GreaterThanEqual
+                    | BinaryOperator::LogicalAnd
+                    | BinaryOperator::LogicalOr => "Bool".to_string(),
+                    _ => {
+                        // For other operators, try to infer from operands
+                        let left_type = self.infer_expression_type_string(left, param);
+                        if left_type != "Unknown" {
+                            left_type
+                        } else {
+                            self.infer_expression_type_string(right, param)
+                        }
+                    }
+                }
+            }
+            Expression::List { elements, .. } => {
+                if elements.is_empty() {
+                    "List Unknown".to_string()
+                } else {
+                    let elem_type = self.infer_expression_type_string(&elements[0], param);
+                    format!("List {}", elem_type)
+                }
+            }
+            Expression::Pair { first, second, .. } => {
+                let first_type = self.infer_expression_type_string(first, param);
+                let second_type = self.infer_expression_type_string(second, param);
+                format!("({}, {})", first_type, second_type)
+            }
+            Expression::Function { .. } => "Function".to_string(),
+            Expression::Print { .. } => "Unit".to_string(),
+            _ => "Unknown".to_string(),
+        }
+    }
+
+    /// Infer parameter type from how it's used in the function body
+    fn infer_parameter_type_from_usage(&self, param: &str, body: &Expression) -> String {
+        // Simple heuristics for parameter type inference
+        match body {
+            Expression::Block { expression, .. } => {
+                // Handle block expressions - recurse into the inner expression
+                if let Some(expr) = expression {
+                    self.infer_parameter_type_from_usage(param, expr)
+                } else {
+                    "Unknown".to_string()
+                }
+            }
+            Expression::BinaryOp {
+                left,
+                right,
+                operator,
+                ..
+            } => {
+                use crate::ast::nodes::BinaryOperator;
+
+                // Check if parameter is used directly in arithmetic operations
+                let param_used_directly = matches!(left.as_ref(), Expression::Identifier { name, .. } if name == param)
+                    || matches!(right.as_ref(), Expression::Identifier { name, .. } if name == param);
+
+                if param_used_directly {
+                    match operator {
+                        BinaryOperator::Add
+                        | BinaryOperator::Subtract
+                        | BinaryOperator::Multiply
+                        | BinaryOperator::Divide => "Int".to_string(),
+                        BinaryOperator::LogicalAnd | BinaryOperator::LogicalOr => {
+                            "Bool".to_string()
+                        }
+                        BinaryOperator::Equal
+                        | BinaryOperator::NotEqual
+                        | BinaryOperator::LessThan
+                        | BinaryOperator::LessThanEqual
+                        | BinaryOperator::GreaterThan
+                        | BinaryOperator::GreaterThanEqual => {
+                            // For comparisons, we can often infer the parameter is Int if comparing with a number
+                            match (left.as_ref(), right.as_ref()) {
+                                (Expression::Number { .. }, _) | (_, Expression::Number { .. }) => {
+                                    "Int".to_string()
+                                }
+                                _ => "Unknown".to_string(),
+                            }
+                        }
+                        _ => "Unknown".to_string(),
+                    }
+                } else {
+                    // Recurse into sub-expressions
+                    let left_infer = self.infer_parameter_type_from_usage(param, left);
+                    if left_infer != "Unknown" {
+                        return left_infer;
+                    }
+                    self.infer_parameter_type_from_usage(param, right)
+                }
+            }
+            Expression::FunctionCall {
+                function, argument, ..
+            } => {
+                // If parameter is called as a function, it's a function type
+                if let Expression::Identifier { name, .. } = function.as_ref() {
+                    if name == param {
+                        let arg_type = self.infer_expression_type_string(argument, param);
+                        return format!("{} -> Unknown", arg_type);
+                    }
+                }
+                // Recurse
+                let func_infer = self.infer_parameter_type_from_usage(param, function);
+                if func_infer != "Unknown" {
+                    return func_infer;
+                }
+                self.infer_parameter_type_from_usage(param, argument)
+            }
+            Expression::FirstProjection { pair, .. }
+            | Expression::SecondProjection { pair, .. } => {
+                // If parameter is used in fst() or snd(), it's a pair
+                if self.expression_uses_param(pair, param) {
+                    "(Unknown, Unknown)".to_string()
+                } else {
+                    self.infer_parameter_type_from_usage(param, pair)
+                }
+            }
+            Expression::HeadProjection { list, .. } | Expression::TailProjection { list, .. } => {
+                // If parameter is used in head() or tail(), it's a list
+                if self.expression_uses_param(list, param) {
+                    "List Unknown".to_string()
+                } else {
+                    self.infer_parameter_type_from_usage(param, list)
+                }
+            }
+            Expression::Cons { head, tail, .. } => {
+                let head_infer = self.infer_parameter_type_from_usage(param, head);
+                if head_infer != "Unknown" {
+                    head_infer
+                } else {
+                    self.infer_parameter_type_from_usage(param, tail)
+                }
+            }
+            _ => "Unknown".to_string(),
+        }
+    }
+
+    /// Check if an expression uses the given parameter
+    fn expression_uses_param(&self, expr: &Expression, param: &str) -> bool {
+        match expr {
+            Expression::Block { expression, .. } => {
+                if let Some(expr) = expression {
+                    self.expression_uses_param(expr, param)
+                } else {
+                    false
+                }
+            }
+            Expression::Identifier { name, .. } => name == param,
+            Expression::BinaryOp { left, right, .. } => {
+                self.expression_uses_param(left, param) || self.expression_uses_param(right, param)
+            }
+            Expression::FunctionCall {
+                function, argument, ..
+            } => {
+                self.expression_uses_param(function, param)
+                    || self.expression_uses_param(argument, param)
+            }
+            Expression::FirstProjection { pair, .. }
+            | Expression::SecondProjection { pair, .. } => self.expression_uses_param(pair, param),
+            Expression::HeadProjection { list, .. } | Expression::TailProjection { list, .. } => {
+                self.expression_uses_param(list, param)
+            }
+            Expression::List { elements, .. } => elements
+                .iter()
+                .any(|elem| self.expression_uses_param(elem, param)),
+            Expression::Pair { first, second, .. } => {
+                self.expression_uses_param(first, param)
+                    || self.expression_uses_param(second, param)
+            }
+            _ => false,
         }
     }
 }

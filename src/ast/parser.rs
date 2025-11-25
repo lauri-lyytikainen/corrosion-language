@@ -199,8 +199,6 @@ impl Parser {
         })
     }
 
-
-
     fn parse_import_statement(&mut self) -> ParseResult<Statement> {
         let start_span = self.current_span();
         self.consume(Token::Import, "Expected 'import'")?;
@@ -427,6 +425,7 @@ impl Parser {
             Token::Char => self.parse_char_at_expression(),
             Token::Length => self.parse_length_expression(),
             Token::ToString => self.parse_tostring_expression(),
+            Token::Type => self.parse_type_of_expression(),
             Token::Fix => self.parse_fix_expression(),
             Token::Inl => self.parse_inl_expression(),
             Token::Inr => self.parse_inr_expression(),
@@ -1172,5 +1171,23 @@ impl Parser {
         );
 
         Ok(Expression::ToString { expression, span })
+    }
+
+    fn parse_type_of_expression(&mut self) -> ParseResult<Expression> {
+        let start_span = self.previous_span();
+
+        self.consume(Token::LeftParen, "Expected '(' after 'type'")?;
+        let expression = Box::new(self.parse_expression()?);
+        self.consume(Token::RightParen, "Expected ')' after type expression")?;
+
+        let end_span = self.previous_span();
+        let span = Span::new(
+            start_span.start,
+            end_span.end,
+            start_span.line,
+            start_span.column,
+        );
+
+        Ok(Expression::TypeOf { expression, span })
     }
 }

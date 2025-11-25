@@ -977,6 +977,12 @@ impl TypeChecker {
                     }
                 }
             }
+            Expression::TypeOf { expression, span } => {
+                let _expression_typed = self.check_expression(expression)?;
+
+                // type() always returns a String representing the type
+                Ok(TypedExpression::new(Type::String, span.clone()))
+            }
             Expression::If {
                 condition,
                 then_branch,

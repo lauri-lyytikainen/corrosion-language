@@ -163,7 +163,9 @@ corrosion-language/
 │   └── interpreter/         # Runtime execution engine
 ├── tests/                   # Integration tests
 ├── examples/                # Example programs
-└── Cargo.toml              # Project configuration
+├── Cargo.toml               # Project configuration
+├── README.md                # Project documentation
+└── TUTORIAL.md              # Getting started guide
 ```
 
 ### Testing
@@ -175,8 +177,8 @@ Comprehensive test suite covering all language components:
 cargo test
 
 # Run specific component tests
-cargo test lexer      # Lexical analysis tests
-cargo test parser     # Parser tests
+cargo test lexer       # Lexical analysis tests
+cargo test ast         # Parser and AST tests
 cargo test typechecker # Type system tests
 cargo test interpreter # Runtime tests
 

@@ -1,7 +1,7 @@
 use crate::ast::Parser;
+use crate::interpreter::Interpreter;
 use crate::lexer::Tokenizer;
 use crate::typechecker::TypeChecker;
-use crate::interpreter::Interpreter;
 use std::io::{self, Write};
 
 pub struct Repl {
@@ -9,6 +9,8 @@ pub struct Repl {
     version: &'static str,
     /// Interpreter instance that maintains state across evaluations
     interpreter: Interpreter,
+    /// Type checker instance that maintains type bindings across evaluations
+    type_checker: TypeChecker,
 }
 
 impl Repl {
@@ -16,6 +18,7 @@ impl Repl {
         Self {
             version: env!("CARGO_PKG_VERSION"),
             interpreter: Interpreter::new(),
+            type_checker: TypeChecker::new(),
         }
     }
 
@@ -48,7 +51,11 @@ impl Repl {
                     }
 
                     match self.process_line(line) {
-                        Ok(_result) => { /* Do nothing - no result display */ },
+                        Ok(result) => {
+                            if !result.is_empty() && result != "()" {
+                                println!("{}", result);
+                            }
+                        }
                         Err(error) => println!("Error: {}", error),
                     }
                 }
@@ -134,15 +141,16 @@ impl Repl {
         let mut parser = Parser::new(tokens);
         let program = parser.parse().map_err(|e| e.to_string())?;
 
-        // Step 3: Type check the AST
-        let mut type_checker = TypeChecker::new();
-        let _typed_program = type_checker
+        // Step 3: Type check the AST using persistent type checker
+        let _typed_program = self
+            .type_checker
             .check_program(&program)
             .map_err(|e| e.to_string())?;
 
         // Step 4: Execute the program with the interpreter
-        let result = self.interpreter
-            .interpret_program(&program)
+        let result = self
+            .interpreter
+            .interpret_program_repl(&program)
             .map_err(|e| e.to_string())?;
 
         Ok(format!("{}", result))

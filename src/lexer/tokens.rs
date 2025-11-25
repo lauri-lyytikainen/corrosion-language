@@ -27,6 +27,7 @@ pub enum Token {
 
     // Built-in functions
     Print, // print (output to console)
+    Type,  // type (get type of value)
 
     // Control flow
     If,    // if

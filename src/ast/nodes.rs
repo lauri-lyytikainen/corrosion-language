@@ -232,6 +232,10 @@ pub enum Expression {
         expression: Box<Expression>,
         span: Span,
     },
+    TypeOf {
+        expression: Box<Expression>,
+        span: Span,
+    },
     // Pattern matching
     Case {
         expression: Box<Expression>,
@@ -342,6 +346,7 @@ impl Spanned for Expression {
             Expression::CharAt { span, .. } => span,
             Expression::Length { span, .. } => span,
             Expression::ToString { span, .. } => span,
+            Expression::TypeOf { span, .. } => span,
             Expression::Case { span, .. } => span,
         }
     }
