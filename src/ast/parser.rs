@@ -86,7 +86,6 @@ impl Parser {
         match &self.peek().token {
             Token::Let => self.parse_variable_declaration(),
             Token::Fn => self.parse_function_declaration(),
-            Token::Const => self.parse_constant_declaration(),
             Token::Import => self.parse_import_statement(),
             _ => self.parse_expression_statement(),
         }
@@ -200,47 +199,7 @@ impl Parser {
         })
     }
 
-    fn parse_constant_declaration(&mut self) -> ParseResult<Statement> {
-        let start_span = self.current_span();
-        self.consume(Token::Const, "Expected 'const'")?;
 
-        let name = if let Token::Identifier(name) = &self.advance().token {
-            name.clone()
-        } else {
-            return Err(ParseError::UnexpectedToken {
-                expected: "constant name".to_string(),
-                found: self.previous().token.clone(),
-                span: self.previous_span(),
-            });
-        };
-
-        // Optional type annotation
-        let type_annotation = if self.peek().token == Token::Colon {
-            self.advance(); // consume ':'
-            Some(self.parse_type_expression()?)
-        } else {
-            None
-        };
-
-        self.consume(Token::Assign, "Expected '='")?;
-        let value = self.parse_expression()?;
-        self.consume(Token::Semicolon, "Expected ';'")?;
-
-        let end_span = self.previous_span();
-        let span = Span::new(
-            start_span.start,
-            end_span.end,
-            start_span.line,
-            start_span.column,
-        );
-
-        Ok(Statement::ConstantDeclaration {
-            name,
-            type_annotation,
-            value,
-            span,
-        })
-    }
 
     fn parse_import_statement(&mut self) -> ParseResult<Statement> {
         let start_span = self.current_span();

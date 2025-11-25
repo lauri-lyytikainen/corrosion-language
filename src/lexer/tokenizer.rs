@@ -63,7 +63,6 @@ fn parse_identifier_or_keyword(input: &str) -> IResult<&str, Token> {
     recognize(pair(alpha1, many0(alt((alphanumeric1, tag("_"))))))
         .map(|s: &str| match s {
             "let" => Token::Let,
-            "const" => Token::Const,
             "import" => Token::Import,
             "from" => Token::From,
             "as" => Token::As,

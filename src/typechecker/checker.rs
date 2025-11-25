@@ -315,50 +315,7 @@ impl TypeChecker {
                     span: span.clone(),
                 })
             }
-            Statement::ConstantDeclaration {
-                name,
-                type_annotation,
-                value,
-                span,
-            } => {
-                // Check if constant is already defined in current scope
-                if self.environment.is_bound_locally(name) {
-                    return Err(TypeError::RedefinedVariable {
-                        name: name.clone(),
-                        span: span.clone(),
-                    });
-                }
 
-                // Type check the value expression
-                let typed_value = self.check_expression(value)?;
-                let inferred_type = typed_value.ty.clone();
-
-                // If there's a type annotation, check it matches the inferred type
-                let final_type = if let Some(annotation) = type_annotation {
-                    let annotated_type = self.convert_type_expression(annotation)?;
-
-                    if !self.types_compatible(&annotated_type, &inferred_type) {
-                        return Err(TypeError::TypeMismatch {
-                            expected: annotated_type,
-                            found: inferred_type,
-                            span: span.clone(),
-                        });
-                    }
-                    annotated_type
-                } else {
-                    inferred_type
-                };
-
-                // Bind the constant to its type
-                self.environment.bind(name.clone(), final_type.clone());
-
-                Ok(TypedStatement::ConstantDeclaration {
-                    name: name.clone(),
-                    ty: final_type,
-                    value: typed_value,
-                    span: span.clone(),
-                })
-            }
             Statement::Import { path, alias, span } => {
                 let import_name = alias.as_ref().unwrap_or(path);
 
@@ -1611,9 +1568,7 @@ impl TypeChecker {
             Statement::FunctionDeclaration { body, .. } => {
                 self.expression_uses_parameter(param, body)
             }
-            Statement::ConstantDeclaration { value, .. } => {
-                self.expression_uses_parameter(param, value)
-            }
+
             Statement::Import { .. } => false,
             Statement::Expression { expression, .. } => {
                 self.expression_uses_parameter(param, expression)
@@ -1630,9 +1585,7 @@ impl TypeChecker {
             Statement::FunctionDeclaration { body, .. } => {
                 self.analyze_parameter_usage(param, body)
             }
-            Statement::ConstantDeclaration { value, .. } => {
-                self.analyze_parameter_usage(param, value)
-            }
+
             Statement::Import { .. } => None,
             Statement::Expression { expression, .. } => {
                 self.analyze_parameter_usage(param, expression)

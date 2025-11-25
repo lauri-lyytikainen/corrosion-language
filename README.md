@@ -2,6 +2,8 @@
 
 Corrosion is a statically typed interpreted functional programming language built with Rust, featuring static typing, immutable data structures, and an interactive development environment. It combines the safety of static typing with the expressiveness of functional programming paradigms.
 
+> The TUTORIAL.md file contains a comprehensive guide to getting started with Corrosion
+
 ## Overview
 
 Corrosion was designed for the [Modern and Emerging Programming Languages](https://fitech101.aalto.fi/en/courses/modern-and-emerging-programming-languages) course, serving as an educational implementation that demonstrates core compiler construction principles and functional programming concepts.
@@ -95,11 +97,11 @@ Corrosion source files use the `.corr` extension by convention.
 
 Corrosion features a rich type system with automatic type inference:
 
-- **Primitive Types**: `Int`, `Bool`, `Unit`
-- **Function Types**: `Int -> Bool`, `(Int, Bool) -> Int`
-- **List Types**: `List Int`, `List Bool`
+- **Primitive Types**: `Int`, `Bool`, `Unit`, `String`
+- **Function Types**: eg. `Int -> Bool`, `(Int, Bool) -> Int`
+- **List Types**: `List Int`, `List Bool`, `List String`
 - **Pair Types**: `(Int, Bool)`, `(String, List Int)`
-- **Sum Types**: `Int + Bool` (union types)
+- **Sum Types**: eg. `Int + Bool` (union types)
 - **Recursive Types**: Support for recursive data structures
 
 ### Data Structures
@@ -133,7 +135,7 @@ First-class functions with lexical scoping and optional parameter typing:
 - **Variables**: `let name = value;`
 - **Named Functions**: `fn name(param: Type) -> Type { body }`
 - **Anonymous Functions**: `fn(param: Type) { body }`
-- **Constants**: `const NAME: Type = value;`
+
 - **Imports**: `import "module.corr" as alias;`
 - **Qualified Access**: `module.member`
 - **Type Annotations**: `let x: Int = 42;`

@@ -1,8 +1,8 @@
-use crate::ast::nodes::{Expression, Program, Statement, TypeExpression};
+use crate::ast::nodes::{Expression, Statement};
 use crate::ast::parser::Parser;
 use crate::interpreter::Interpreter;
 use crate::lexer::tokenizer::Tokenizer;
-use crate::lexer::tokens::Span;
+
 use crate::typechecker::TypeChecker;
 
 #[test]
@@ -31,7 +31,13 @@ fn test_function_declaration_with_typed_parameter() {
     let program = parser.parse().unwrap();
 
     match &program.statements[0] {
-        Statement::FunctionDeclaration { name, param, param_type, return_type, .. } => {
+        Statement::FunctionDeclaration {
+            name,
+            param,
+            param_type,
+            return_type,
+            ..
+        } => {
             assert_eq!(name, "add");
             assert_eq!(param, "x");
             assert!(param_type.is_some());
@@ -50,33 +56,19 @@ fn test_function_declaration_with_typed_parameter_no_return() {
     let program = parser.parse().unwrap();
 
     match &program.statements[0] {
-        Statement::FunctionDeclaration { name, param, param_type, return_type, .. } => {
+        Statement::FunctionDeclaration {
+            name,
+            param,
+            param_type,
+            return_type,
+            ..
+        } => {
             assert_eq!(name, "double");
             assert_eq!(param, "y");
             assert!(param_type.is_some());
             assert!(return_type.is_none());
         }
         _ => panic!("Expected function declaration"),
-    }
-}
-
-#[test]
-fn test_const_declaration_parsing() {
-    let input = "const PI: Int = 3;";
-    let mut tokenizer = Tokenizer::new(input);
-    let tokens = tokenizer.tokenize(input).unwrap();
-    let mut parser = Parser::new(tokens);
-    let program = parser.parse().unwrap();
-
-    match &program.statements[0] {
-        Statement::ConstantDeclaration { name, value, .. } => {
-            assert_eq!(name, "PI");
-            match value {
-                Expression::Number { value, .. } => assert_eq!(*value, 3),
-                _ => panic!("Expected number value"),
-            }
-        }
-        _ => panic!("Expected constant declaration"),
     }
 }
 
@@ -127,29 +119,15 @@ fn test_function_declaration_type_checking() {
     let tokens = tokenizer.tokenize(input).unwrap();
     let mut parser = Parser::new(tokens);
     let program = parser.parse().unwrap();
-    
+
     let mut type_checker = TypeChecker::new();
     let typed_program = type_checker.check_program(&program);
-    
+
     match &typed_program {
         Ok(_) => println!("Type checking succeeded"),
         Err(e) => println!("Type checking failed: {}", e),
     }
-    
-    assert!(typed_program.is_ok());
-}
 
-#[test]
-fn test_const_declaration_type_checking() {
-    let input = "const PI: Int = 3;";
-    let mut tokenizer = Tokenizer::new(input);
-    let tokens = tokenizer.tokenize(input).unwrap();
-    let mut parser = Parser::new(tokens);
-    let program = parser.parse().unwrap();
-    
-    let mut type_checker = TypeChecker::new();
-    let typed_program = type_checker.check_program(&program);
-    
     assert!(typed_program.is_ok());
 }
 
@@ -160,15 +138,15 @@ fn test_function_declaration_with_typed_parameter_type_checking() {
     let tokens = tokenizer.tokenize(input).unwrap();
     let mut parser = Parser::new(tokens);
     let program = parser.parse().unwrap();
-    
+
     let mut type_checker = TypeChecker::new();
     let typed_program = type_checker.check_program(&program);
-    
+
     match &typed_program {
         Ok(_) => println!("Type checking succeeded for typed parameter"),
         Err(e) => println!("Type checking failed: {}", e),
     }
-    
+
     assert!(typed_program.is_ok());
 }
 
@@ -179,10 +157,10 @@ fn test_function_declaration_interpretation() {
     let tokens = tokenizer.tokenize(input).unwrap();
     let mut parser = Parser::new(tokens);
     let program = parser.parse().unwrap();
-    
+
     let mut interpreter = Interpreter::new();
     let result = interpreter.interpret_program(&program);
-    
+
     assert!(result.is_ok());
 }
 
@@ -196,7 +174,9 @@ fn test_anonymous_function_with_typed_parameter() {
 
     match &program.statements[0] {
         Statement::VariableDeclaration { value, .. } => match value {
-            Expression::Function { param, param_type, .. } => {
+            Expression::Function {
+                param, param_type, ..
+            } => {
                 assert_eq!(param, "x");
                 assert!(param_type.is_some());
             }
@@ -216,7 +196,9 @@ fn test_anonymous_function_backward_compatibility() {
 
     match &program.statements[0] {
         Statement::VariableDeclaration { value, .. } => match value {
-            Expression::Function { param, param_type, .. } => {
+            Expression::Function {
+                param, param_type, ..
+            } => {
                 assert_eq!(param, "x");
                 assert!(param_type.is_none()); // Should be None for backward compatibility
             }
@@ -224,18 +206,4 @@ fn test_anonymous_function_backward_compatibility() {
         },
         _ => panic!("Expected variable declaration"),
     }
-}
-
-#[test]
-fn test_const_declaration_interpretation() {
-    let input = "const PI = 3; let doubled = PI * 2;";
-    let mut tokenizer = Tokenizer::new(input);
-    let tokens = tokenizer.tokenize(input).unwrap();
-    let mut parser = Parser::new(tokens);
-    let program = parser.parse().unwrap();
-    
-    let mut interpreter = Interpreter::new();
-    let result = interpreter.interpret_program(&program);
-    
-    assert!(result.is_ok());
 }

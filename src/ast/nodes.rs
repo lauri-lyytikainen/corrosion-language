@@ -78,12 +78,6 @@ pub enum Statement {
         body: Expression,
         span: Span,
     },
-    ConstantDeclaration {
-        name: String,
-        type_annotation: Option<TypeExpression>,
-        value: Expression,
-        span: Span,
-    },
     Import {
         path: String,
         alias: Option<String>, // Optional alias for the imported module
@@ -311,7 +305,6 @@ impl Spanned for Statement {
         match self {
             Statement::VariableDeclaration { span, .. } => span,
             Statement::FunctionDeclaration { span, .. } => span,
-            Statement::ConstantDeclaration { span, .. } => span,
             Statement::Import { span, .. } => span,
             Statement::Expression { span, .. } => span,
         }

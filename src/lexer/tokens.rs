@@ -2,7 +2,6 @@
 pub enum Token {
     // Keywords
     Let,
-    Const,  // const (constant declaration)
     Import, // import (file import)
     From,   // from (import source)
 
