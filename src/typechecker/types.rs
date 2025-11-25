@@ -33,6 +33,10 @@ impl Type {
         match (self, other) {
             (Type::Error, _) | (_, Type::Error) => true, // Error type is compatible with anything
             (Type::Unknown, _) | (_, Type::Unknown) => true, // Unknown can be inferred
+            // Allow list types with unknown elements to be compatible
+            (Type::List { element: e1 }, Type::List { element: e2 }) => {
+                e1.is_assignable_to(e2) || e2.is_assignable_to(e1)
+            }
             (a, b) => a == b, // For now, require exact match. Can be extended for subtyping
         }
     }
@@ -79,6 +83,22 @@ impl Type {
             }
             (Type::Unknown, BinaryOp::NotEqual, _) | (_, BinaryOp::NotEqual, Type::Unknown) => {
                 Some(Type::Bool)
+            }
+
+            // List equality operations (including unknown element types)
+            (Type::List { element: e1 }, BinaryOp::Equal, Type::List { element: e2 }) => {
+                if e1.is_assignable_to(e2) || e2.is_assignable_to(e1) {
+                    Some(Type::Bool)
+                } else {
+                    None
+                }
+            }
+            (Type::List { element: e1 }, BinaryOp::NotEqual, Type::List { element: e2 }) => {
+                if e1.is_assignable_to(e2) || e2.is_assignable_to(e1) {
+                    Some(Type::Bool)
+                } else {
+                    None
+                }
             }
             (Type::Unknown, BinaryOp::LessThan, _) | (_, BinaryOp::LessThan, Type::Unknown) => {
                 Some(Type::Bool)

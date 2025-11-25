@@ -837,11 +837,7 @@ impl Interpreter {
                 result
             }
             Value::Pair(first, second) => {
-                format!(
-                    "({}, {})",
-                    self.format_for_print(first),
-                    self.format_for_print(second)
-                )
+                format!("({}, {})", self.format_for_print(first), self.format_for_print(second))
             }
             Value::Function { param, .. } => format!("<function {}>", param),
             Value::LeftInject(val) => format!("Left({})", self.format_for_print(val)),

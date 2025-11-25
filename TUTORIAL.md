@@ -66,7 +66,13 @@ Every statement in Corrosion must end with a semicolon (`;`):
 42;
 true;
 let x = 10;
-print(x);  // Output values using print
+print(x);
+```
+
+Output:
+
+```rust
+10
 ```
 
 ### Expressions and Output
@@ -76,7 +82,13 @@ To display values, use the `print` statement:
 ```rust
 let x = 5;
 let y = 10;
-print(x + y);  // Prints: 15
+print(x + y);
+```
+
+Output:
+
+```rust
+15
 ```
 
 ## Variables and Types
@@ -97,8 +109,21 @@ You can explicitly specify types:
 
 ```rust
 let x: Int = 42;
+print(type(x));
+
 let flag: Bool = true;
+print(type(flag));
+
 let numbers: List Int = [1, 2, 3];
+print(type(numbers));
+```
+
+Output
+
+```rust
+Int
+Bool
+List Int
 ```
 
 ### Immutability
@@ -107,7 +132,13 @@ All variables in Corrosion are immutable by default. Once assigned, their values
 
 ```rust
 let x = 10;
-// x = 20;  // This would be an error!
+let x = 20;
+```
+
+Output:
+
+```rust
+Error: Type error: Variable 'x' redefined at line 2, column 1
 ```
 
 ## Expressions and Operations
@@ -145,8 +176,17 @@ let not_op = !true;           // Logical NOT: false
 Operators follow standard mathematical precedence:
 
 ```rust
-let result = 2 + 3 * 4;  // 14 (not 20)
-let result2 = (2 + 3) * 4;  // 20
+let result = 2 + 3 * 4;
+print(result);  // 14, because multiplication has higher precedence than addition
+let result2 = (2 + 3) * 4;
+print(result2);  // 20
+```
+
+Output:
+
+```rust
+14
+20
 ```
 
 ## Functions
@@ -156,12 +196,29 @@ let result2 = (2 + 3) * 4;  // 20
 Functions are defined using the `fn` keyword. You can optionally specify parameter types for better type safety and documentation:
 
 ```rust
-// Without type annotations (uses type inference)
-let add_one = fn(x) { x + 1 };
+let add_one_lambda = fn(x) { x + 1 };
+fn add_one(x) {  // Named function
+    x + 1
+}
+print(add_one_lambda(5));  // 6
+print(add_one(10));        // 11
 
 // With explicit parameter types
-let add_numbers = fn(x: Int, y: Int) { x + y };
-let greet = fn(name: String) { concat("Hello, ", name) };
+let greet_lambda = fn(name: String) { concat("Hello, ", name) };
+fn greet(name: String) { // Named function with typed parameter
+    concat("Hello, ", name)
+}
+print(greet_lambda("Alice"));  // "Hello, Alice"
+print(greet("Bob"));           // "Hello, Bob"
+```
+
+§ Output:
+
+```rust
+6
+11
+Hello, Alice
+Hello, Bob
 ```
 
 ### Function Calls
@@ -169,8 +226,18 @@ let greet = fn(name: String) { concat("Hello, ", name) };
 Functions are called by passing arguments in parentheses:
 
 ```rust
+fn add_one(x) {
+    x + 1
+}
+
 let result = add_one(5);
-print(result);  // Prints: 6
+print(result);
+```
+
+Output:
+
+```rust
+6
 ```
 
 ### Higher-Order Functions
@@ -178,6 +245,10 @@ print(result);  // Prints: 6
 Functions can take other functions as arguments:
 
 ```rust
+fn add_one(x) {
+    x + 1
+}
+
 let apply_twice = fn(f) {
     fn(x) { f(f(x)) }
 };
@@ -185,6 +256,12 @@ let apply_twice = fn(f) {
 let add_two = apply_twice(add_one);
 let result = add_two(5);
 print(result);  // Prints: 7
+```
+
+Output:
+
+```rust
+7
 ```
 
 ### Closures
@@ -197,8 +274,20 @@ let multiply_by_three = fn(x: Int) { x * multiplier };
 let result = multiply_by_three(4);
 print(result);  // Prints: 12
 
-// Closures with multiple typed parameters
-let calculate = fn(base: Int, factor: Int) { base * multiplier + factor };
+// Closures that return functions (currying)
+let make_calculator = fn(base: Int) {
+    fn(factor: Int) { base * multiplier + factor }
+};
+let calculator = make_calculator(10);
+let final_result = calculator(5);
+print(final_result);  // Prints: 35 (10 * 3 + 5)
+```
+
+Output:
+
+```rust
+12
+35
 ```
 
 ### When to Use Parameter Typing
@@ -208,7 +297,6 @@ Parameter typing is optional in Corrosion, but it's recommended in these situati
 - **Documentation**: Makes function interfaces clear to other developers
 - **Type Safety**: Catches type errors early during compilation
 - **Complex Functions**: When parameter types aren't obvious from context
-- **API Boundaries**: For functions that will be called from multiple places
 
 ```rust
 // Good candidates for explicit typing
@@ -284,6 +372,27 @@ print(rest);  // Prints: [2, 3, 4]
 ```
 
 **Note**: `tail` on an empty list will cause a runtime error.
+
+#### List length
+
+There is no built-in `length` function for lists, but you can use function like this to get the length of a list:
+
+```rust
+let numbers = [1, 2, 3, 4, 5];
+
+let list_length = fix(fn(self) {
+    fn(lst: List Int) {
+        if lst == [] {
+            0
+        } else {
+            1 + self(tail(lst))
+        }
+    }
+});
+
+print(list_length(numbers));
+
+```
 
 ### List Processing Patterns
 

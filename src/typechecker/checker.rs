@@ -474,7 +474,14 @@ impl TypeChecker {
                         let refined_result = self.refine_type_with_context(result, &Type::Unknown);
 
                         // Check if argument type is compatible with parameter type
-                        if self.types_compatible(&argument_typed.ty, &refined_param) {
+                        // Be more permissive with Unknown types in recursive contexts
+                        let is_compatible = self
+                            .types_compatible(&argument_typed.ty, &refined_param)
+                            || (argument_typed.ty == Type::Unknown
+                                && matches!(refined_param, Type::List { .. }))
+                            || matches!(&argument_typed.ty, Type::List { element } if **element == Type::Unknown);
+
+                        if is_compatible {
                             Ok(TypedExpression::new(refined_result, span.clone()))
                         } else {
                             Err(TypeError::TypeMismatch {
@@ -674,22 +681,28 @@ impl TypeChecker {
                                     result: outer_result,
                                 },
                             ) => {
-                                // Verify that inner_param == inner_result and outer_param == outer_result
-                                if inner_param == inner_result
-                                    && outer_param == outer_result
-                                    && inner_param == outer_param
+                                // More flexible type checking for recursive functions
+                                if self.types_compatible(inner_param, inner_result)
+                                    && self.types_compatible(outer_param, outer_result)
+                                    && self.types_compatible(inner_param, outer_param)
                                 {
                                     // Return the fixed point type T -> T
                                     Ok(TypedExpression::new(
                                         Type::Function {
-                                            param: inner_param.clone(),
-                                            result: inner_result.clone(),
+                                            param: outer_param.clone(),
+                                            result: outer_result.clone(),
                                         },
                                         span.clone(),
                                     ))
                                 } else {
-                                    // For now, allow any function type and return the result type
-                                    Ok(TypedExpression::new(result.as_ref().clone(), span.clone()))
+                                    // For more flexible cases, return the outer function type
+                                    Ok(TypedExpression::new(
+                                        Type::Function {
+                                            param: outer_param.clone(),
+                                            result: outer_result.clone(),
+                                        },
+                                        span.clone(),
+                                    ))
                                 }
                             }
                             _ => {
@@ -1163,13 +1176,25 @@ impl TypeChecker {
         }
     }
 
-    /// Check if two types are compatible
     /// Refine a type by replacing Unknown with more specific types based on context
     fn refine_type_with_context(&self, original: &Type, context: &Type) -> Type {
         match (original, context) {
             (Type::Unknown, concrete_type) if !matches!(concrete_type, Type::Unknown) => {
                 concrete_type.clone()
             }
+            // Handle List types with Unknown elements
+            (
+                Type::List { element },
+                Type::List {
+                    element: context_element,
+                },
+            ) => Type::List {
+                element: Box::new(self.refine_type_with_context(element, context_element)),
+            },
+            // If original is Unknown but context suggests List, use List with Unknown elements
+            (Type::Unknown, Type::List { .. }) => context.clone(),
+            // If context has Unknown but original is more specific, prefer original
+            (original_type, Type::Unknown) => original_type.clone(),
             (Type::Function { param, result }, _) => Type::Function {
                 param: Box::new(self.refine_type_with_context(param, &Type::Unknown)),
                 result: Box::new(self.refine_type_with_context(result, &Type::Unknown)),
@@ -1456,6 +1481,17 @@ impl TypeChecker {
                     }
                 }
 
+                // Special case: if argument is tail(param), infer function takes lists
+                if let Expression::TailProjection { list, .. } = argument.as_ref() {
+                    if self.expression_uses_parameter(param, list) {
+                        // The function being called should accept a list type
+                        // and return some type (Unknown for now)
+                        return Some(Type::List {
+                            element: Box::new(Type::Unknown),
+                        });
+                    }
+                }
+
                 // Recursively check sub-expressions
                 self.analyze_parameter_usage(param, function)
                     .or_else(|| self.analyze_parameter_usage(param, argument))
@@ -1485,10 +1521,9 @@ impl TypeChecker {
             Expression::HeadProjection { list, .. } => {
                 // If parameter is used in head(), infer it's a list type
                 if self.expression_uses_parameter(param, list) {
-                    // Try to infer element type from context
-                    // Default to Int for arithmetic contexts, Unknown otherwise
+                    // Use Unknown for element type to allow flexible inference
                     Some(Type::List {
-                        element: Box::new(Type::Int),
+                        element: Box::new(Type::Unknown),
                     })
                 } else {
                     self.analyze_parameter_usage(param, list)
@@ -1497,10 +1532,9 @@ impl TypeChecker {
             Expression::TailProjection { list, .. } => {
                 // If parameter is used in tail(), infer it's a list type
                 if self.expression_uses_parameter(param, list) {
-                    // Try to infer element type from context
-                    // Default to Int for arithmetic contexts, Unknown otherwise
+                    // Use Unknown for element type to allow flexible inference
                     Some(Type::List {
-                        element: Box::new(Type::Int),
+                        element: Box::new(Type::Unknown),
                     })
                 } else {
                     self.analyze_parameter_usage(param, list)
