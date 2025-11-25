@@ -349,6 +349,12 @@ let extended = cons(1, original);
 print(extended);  // Prints: [1, 2, 3, 4]
 ```
 
+Output:
+
+```rust
+[1, 2, 3, 4]
+```
+
 ### `head` - Getting the First Element
 
 The `head` operation returns the first element of a list:
@@ -357,6 +363,12 @@ The `head` operation returns the first element of a list:
 let numbers = [1, 2, 3];
 let first = head(numbers);
 print(first);  // Prints: 1
+```
+
+Output:
+
+```rust
+1
 ```
 
 **Note**: `head` on an empty list will cause a runtime error.
@@ -371,6 +383,13 @@ let rest = tail(numbers);
 print(rest);  // Prints: [2, 3, 4]
 ```
 
+Output:
+
+```rust
+[2, 3, 4]
+```
+
+p
 **Note**: `tail` on an empty list will cause a runtime error.
 
 #### List length
@@ -424,12 +443,24 @@ let x_coord = fst(point);
 print(x_coord);  // Prints: 10
 ```
 
+Output:
+
+```rust
+10
+```
+
 ### `snd` - Getting the Second Element
 
 ```rust
 let point = (10, 20);
 let y_coord = snd(point);
 print(y_coord);  // Prints: 20
+```
+
+Output:
+
+```rust
+20
 ```
 
 ### Nested Pair Access
@@ -479,6 +510,17 @@ let x = 5;
 if x > 0 {
     print("Positive number");
 };
+
+if false {
+    print("This won't execute");
+};
+```
+
+Output:
+
+```rust
+Always executes
+Positive number
 ```
 
 2. **Unit type for statements**: If expressions without else must return Unit:
@@ -536,8 +578,6 @@ let abs = fn(x) {
 
 Corrosion supports for loops for iterating over ranges and collections:
 
-#### Iterating Over Ranges
-
 ```rust
 // Print numbers from 1 to 10
 for i in range(1, 11) {
@@ -548,6 +588,26 @@ for i in range(1, 11) {
 for x in range(0, 5) {
     print(x);  // Prints: 0, 1, 2, 3, 4
 };
+```
+
+Output:
+
+```rust
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+0
+1
+2
+3
+4
 ```
 
 #### Iterating Over Lists
@@ -564,6 +624,17 @@ for word in words {
 };
 ```
 
+Output:
+
+```rust
+10
+20
+30
+40
+hello
+world
+```
+
 #### Loop Body
 
 The loop body can contain any valid statements:
@@ -576,6 +647,14 @@ for i in range(1, 4) {
 };
 ```
 
+Output:
+
+```rust
+5
+10
+15
+```
+
 #### Nested Loops
 
 ```rust
@@ -584,6 +663,17 @@ for i in range(1, 4) {
         print((i, j));  // Prints pairs: (1,1), (1,2), (2,1), (2,2), (3,1), (3,2)
     };
 };
+```
+
+Output:
+
+```rust
+(1, 1)
+(1, 2)
+(2, 1)
+(2, 2)
+(3, 1)
+(3, 2)
 ```
 
 ### Range Function
@@ -627,6 +717,13 @@ let add_one = fix(fn(f) { fn(x) { x + 1 } });
 print(add_one(10));  // Prints: 11
 ```
 
+Output:
+
+```rust
+42
+11
+```
+
 #### Function Composition with Recursion
 
 ```rust
@@ -644,6 +741,12 @@ let quadruple = apply_twice(double);
 print(quadruple(5));  // Prints: 20 (5 * 2 * 2)
 ```
 
+Output:
+
+```rust
+20
+```
+
 #### Higher-Order Recursive Functions
 
 ```rust
@@ -658,6 +761,12 @@ let make_adder = fix(fn(self) {
 
 let add_10 = make_adder(10);
 print(add_10(5));  // Prints: 15
+```
+
+Output:
+
+```rust
+15
 ```
 
 #### Mathematical Foundation
@@ -686,6 +795,12 @@ let times_three = make_multiplier(3);
 print(times_three(10)); // Prints: 30
 ```
 
+Output:
+
+```rust
+30
+```
+
 ### Higher-Order Functions
 
 The type system fully supports higher-order functions - functions that take other functions as parameters:
@@ -703,30 +818,11 @@ let add_two = fn(n) { n + 2 };
 print(compose(increment)(add_two)(10)); // Prints: 13
 ```
 
-### Recursion vs Loops
-
-- **Loops** (`for`): Best for simple iteration over collections and ranges
-- **Recursion** (`fix`): Best for complex functional patterns and self-referential algorithms
-- **Performance**: Both are suitable for different use cases, loops are more direct for simple iteration
-
-### Combining Recursion and Loops
+Output:
 
 ```rust
-// Use loops for simple iteration, recursion for complex logic
-let process_ranges = fix(fn(self) {
-    fn(processor) {
-        fn(max_range) {
-            for i in range(1, max_range) {
-                let processed = processor(i);
-                print(processed);
-            };
-        }
-    }
-});
-
-let square = fn(x) { x * x };
-let square_printer = process_ranges(square);
-square_printer(5);  // Prints squares: 1, 4, 9, 16
+7
+13
 ```
 
 ## Type System
@@ -747,8 +843,18 @@ Function types show the input and output types:
 // Int -> Int (takes Int, returns Int)
 let add_one: Int -> Int = fn(x) { x + 1 };
 
-// (Int, Int) -> Int (takes two Ints, returns Int)
-let add: (Int, Int) -> Int = fn(x) { fn(y) { x + y } };
+// Int -> (Int -> Int) (curried: takes Int, returns function that takes Int and returns Int)
+let add: Int -> (Int -> Int) = fn(x) { fn(y) { x + y } };
+
+print(add_one(5));      //  6
+print(add(3)(4));       //  7
+```
+
+Output:
+
+```rust
+6
+7
 ```
 
 #### List Types
