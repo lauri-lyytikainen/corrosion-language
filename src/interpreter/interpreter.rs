@@ -380,7 +380,7 @@ impl Interpreter {
 
             Expression::Print { value, span: _ } => {
                 let val = self.interpret_expression(value)?;
-                println!("{}", val);
+                println!("{}", self.format_for_print(&val));
                 Ok(Value::Unit)
             }
 
@@ -814,6 +814,39 @@ impl Interpreter {
             Value::LeftInject(val) => format!("inl({})", self.value_to_string(val)),
             Value::RightInject(val) => format!("inr({})", self.value_to_string(val)),
             Value::FixedPoint { .. } => "<fixed-point>".to_string(),
+            Value::Module { name, .. } => format!("<module {}>", name),
+        }
+    }
+
+    /// Format a value for print output (strings without quotes)
+    fn format_for_print(&self, value: &Value) -> String {
+        match value {
+            Value::String(s) => s.clone(), // No quotes for print output
+            Value::Int(n) => n.to_string(),
+            Value::Bool(b) => b.to_string(),
+            Value::Unit => "()".to_string(),
+            Value::List(elements) => {
+                let mut result = String::from("[");
+                for (i, elem) in elements.iter().enumerate() {
+                    if i > 0 {
+                        result.push_str(", ");
+                    }
+                    result.push_str(&self.format_for_print(elem));
+                }
+                result.push(']');
+                result
+            }
+            Value::Pair(first, second) => {
+                format!(
+                    "({}, {})",
+                    self.format_for_print(first),
+                    self.format_for_print(second)
+                )
+            }
+            Value::Function { param, .. } => format!("<function {}>", param),
+            Value::LeftInject(val) => format!("Left({})", self.format_for_print(val)),
+            Value::RightInject(val) => format!("Right({})", self.format_for_print(val)),
+            Value::FixedPoint { .. } => "<fixed_point>".to_string(),
             Value::Module { name, .. } => format!("<module {}>", name),
         }
     }
