@@ -55,6 +55,7 @@ Corrosion has the following reserved keywords:
 - `range` - Range generation
 - `true`, `false` - Boolean literals
 - `print` - Output statement
+- `type` - Type inspection
 - `cons`, `head`, `tail` - List operations
 - `fst`, `snd` - Pair operations
 
@@ -75,6 +76,18 @@ Output:
 10
 ```
 
+If a statement is missing a semicolon, a parse error will occur:
+
+```rust
+print(1)
+```
+
+Output:
+
+```
+"Error: Parse error: Unexpected token at line 4, column 8: Expected ';', found Eof"
+```
+
 ### Expressions and Output
 
 To display values, use the `print` statement:
@@ -89,6 +102,19 @@ Output:
 
 ```rust
 15
+```
+
+The `print` statement can print any value type, including integers, booleans, lists, pairs, and functions.
+If yo try to print nothing, it will throw a parse error:
+
+```rust
+print();
+```
+
+Output:
+
+```
+Error: Parse error: Unexpected token at line 1, column 7: expression, found RightParen
 ```
 
 ## Variables and Types
@@ -126,6 +152,31 @@ Bool
 List Int
 ```
 
+### Type expression
+
+You can inspect the type of any expression using the `type` function.
+It returns a string representation of the type:
+
+```rust
+print(type(42));              // Int
+print(type(true));            // Bool
+print(type([1, 2, 3]));       // List Int
+print(type((10, 20)));        // (Int, Int)
+print(type(fn(x) { x + 1 })); // Int -> Int
+```
+
+If you try to use `type` without an argument, it will throw a parse error:
+
+```rust
+type();
+```
+
+Output:
+
+```
+Error: Parse error: Unexpected token at line 1, column 6: expression, found RightParen
+```
+
 ### Immutability
 
 All variables in Corrosion are immutable by default. Once assigned, their values cannot be changed:
@@ -152,6 +203,18 @@ let c = 6 * 7;      // Multiplication: 42
 let d = 15 / 3;     // Division: 5
 ```
 
+Using arithmetic operations for non-integer types will result in a type error:
+
+```rust
+let result = true + 5;  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Invalid binary operation at line 1, column 14: 'Bool' Add 'Int'
+```
+
 ### Comparison Operations
 
 ```rust
@@ -163,12 +226,36 @@ let gt = 10 > 5;      // Greater than: true
 let gte = 10 >= 10;   // Greater than or equal: true
 ```
 
+If you try to compare incompatible types, it will result in a type error:
+
+```rust
+let result = 10 == true;  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Invalid binary operation at line 1, column 14: 'Int' Equal 'Bool'
+```
+
 ### Logical Operations
 
 ```rust
 let and_op = true && false;   // Logical AND: false
 let or_op = true || false;    // Logical OR: true
 let not_op = !true;           // Logical NOT: false
+```
+
+If you try to use logical operations on non-boolean types, it will result in a type error:
+
+```rust
+let result = 10 && true;  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Invalid binary operation at line 1, column 14: 'Int' LogicalAnd 'Bool'
 ```
 
 ### Operator Precedence
@@ -212,13 +299,41 @@ print(greet_lambda("Alice"));  // "Hello, Alice"
 print(greet("Bob"));           // "Hello, Bob"
 ```
 
-§ Output:
+Output:
 
 ```rust
 6
 11
 Hello, Alice
 Hello, Bob
+```
+
+If the parameter type is incorrect, it will result in a type error:
+
+```rust
+fn square(x: Int) {
+    x * x
+}
+let result = square(true);  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 4, column 14: expected 'Int', found 'Bool'
+```
+
+Corrosion can also infer parameter types when they are not specified, based on how the function is used.
+
+```rust
+let substract_one = fn(x) { x - 1 };  // Type inferred as Int -> Int
+let result = substract_one(true);  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 2, column 14: expected 'Int', found 'Bool'
 ```
 
 ### Function Calls
@@ -290,6 +405,24 @@ Output:
 35
 ```
 
+Variables can not be used outside their scope:
+
+```rust
+let foo = fn(x: Int) {
+    let y = x + 1;
+    fn(z: Int) { y + z }  // 'y' is captured here
+};
+
+let bar = foo(5);
+print(y) ;  // Error: 'y' is not defined in this scope
+```
+
+Output:
+
+```
+Error: Type error: Undefined variable 'y' at line 6, column 7
+```
+
 ### When to Use Parameter Typing
 
 Parameter typing is optional in Corrosion, but it's recommended in these situations:
@@ -319,6 +452,18 @@ let numbers = [1, 2, 3, 4, 5];
 let booleans = [true, false, true];
 ```
 
+If you try to create a list with mixed types, it will result in a type error:
+
+```rust
+let mixed = [1, true, "string"];  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 1, column 17: expected 'Int', found 'Bool'
+```
+
 #### Nested Lists
 
 Lists can contain other lists:
@@ -335,6 +480,29 @@ Pairs combine exactly two values (which can be of different types):
 let coordinate = (10, 20);
 let mixed_pair = (42, true);
 let nested_pair = ((1, 2), (3, 4));
+print(type(coordinate));  // (Int, Int)
+print(type(mixed_pair));  // (Int, Bool)
+print(type(nested_pair)); // ((Int, Int), (Int, Int))
+```
+
+Output:
+
+```rust
+(Int, Int)
+(Int, Bool)
+((Int, Int), (Int, Int))
+```
+
+If you try to create a pair with more or fewer than two elements, it will result in a parse error:
+
+```rust
+let invalid_pair = (1, 2, 3);  // Parse error
+```
+
+Output:
+
+```
+Error: Parse error: Unexpected token at line 1, column 25: Expected ')' after pair, found Comma
 ```
 
 ## List Operations
@@ -355,6 +523,32 @@ Output:
 [1, 2, 3, 4]
 ```
 
+If you try to `cons` an element of a different type than the list, it will result in a type error:
+
+```rust
+let numbers = [1, 2, 3];
+let invalid = cons(true, numbers);  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 2, column 20: expected 'Int', found 'Bool'
+```
+
+If you try to `cons` onto a non-list type, it will also result in a type error:
+
+```rust
+let not_a_list = 42;
+let invalid = cons(1, not_a_list);  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 2, column 23: expected 'List unknown', found 'Int'
+```
+
 ### `head` - Getting the First Element
 
 The `head` operation returns the first element of a list:
@@ -363,12 +557,27 @@ The `head` operation returns the first element of a list:
 let numbers = [1, 2, 3];
 let first = head(numbers);
 print(first);  // Prints: 1
+print(type(first));  // Prints: Int
 ```
 
 Output:
 
-```rust
+```
 1
+Int
+```
+
+If you try to get the `head` of a non-list type, it will result in a type error:
+
+```rust
+let not_a_list = 42;
+let invalid = head(not_a_list);  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 2, column 15: expected 'List unknown', found 'Int'
 ```
 
 **Note**: `head` on an empty list will cause a runtime error.
@@ -389,8 +598,18 @@ Output:
 [2, 3, 4]
 ```
 
-p
-**Note**: `tail` on an empty list will cause a runtime error.
+```rust
+let not_a_list = 42;
+let invalid = tail(not_a_list);  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 2, column 15: expected 'List unknown', found 'Int'
+```
+
+**Note**: `tail` on an empty list or non list-type will cause a runtime error.
 
 #### List length
 
@@ -411,6 +630,12 @@ let list_length = fix(fn(self) {
 
 print(list_length(numbers));
 
+```
+
+Output:
+
+```rust
+5
 ```
 
 ### List Processing Patterns
@@ -441,12 +666,27 @@ let three_items = cons(3, two_items);   // [3, 2, 1]
 let point = (10, 20);
 let x_coord = fst(point);
 print(x_coord);  // Prints: 10
+print(type(x_coord));  // Prints: Int
 ```
 
 Output:
 
 ```rust
 10
+Int
+```
+
+If you try to get the `fst` of a non-pair type, it will result in a type error:
+
+```rust
+let not_a_pair = 42;
+let invalid = fst(not_a_pair);  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 2, column 15: expected '(error, error)', found 'Int'
 ```
 
 ### `snd` - Getting the Second Element
@@ -455,12 +695,27 @@ Output:
 let point = (10, 20);
 let y_coord = snd(point);
 print(y_coord);  // Prints: 20
+print(type(y_coord));  // Prints: Int
 ```
 
 Output:
 
 ```rust
 20
+Int
+```
+
+If you try to get the `snd` of a non-pair type, it will result in a type error:
+
+```rust
+let not_a_pair = 42;
+let invalid = snd(not_a_pair);  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 2, column 15: expected '(error, error)', found 'Int'
 ```
 
 ### Nested Pair Access
@@ -485,6 +740,21 @@ Corrosion supports conditional execution with `if` expressions:
 if condition {
     // code to execute if condition is true
 };
+```
+
+If the condition is not boolean, it will result in a type error:
+
+```rust
+let x = 5;
+if x {
+    print("This will cause a type error");
+};
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 2, column 4: expected 'Bool', found 'Int'
 ```
 
 #### If-Else Expression
@@ -687,6 +957,18 @@ let r2 = range(10, 13); // [10, 11, 12]
 let r3 = range(5, 5);   // [] (empty range)
 ```
 
+The parameters must be integers, otherwise it will result in a type error:
+
+```rust
+range(true, false);  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 1, column 1: expected 'Int', found 'Bool'
+```
+
 **Note**: The `range` function is exclusive of the end value, meaning `range(1, 4)` produces `[1, 2, 3]`.
 
 ## Recursion
@@ -715,6 +997,8 @@ print(identity(42));  // Prints: 42
 // Function that adds 1
 let add_one = fix(fn(f) { fn(x) { x + 1 } });
 print(add_one(10));  // Prints: 11
+
+print(type(identity));  // Prints: FixedPoint
 ```
 
 Output:
@@ -722,6 +1006,7 @@ Output:
 ```rust
 42
 11
+FixedPoint
 ```
 
 #### Function Composition with Recursion
@@ -970,6 +1255,20 @@ let result = concat("Hello", " World");
 print(result);  // Prints: "Hello World"
 ```
 
+If yout want to concatenate non-string types, convert them first using `toString`:
+
+```rust
+let number = 42;
+let message = "The answer is: " + toString(number);
+print(message);  // Prints: "The answer is: 42"
+```
+
+Output:
+
+```rust
+The answer is: 42
+```
+
 ### String Operations
 
 #### Getting String Length
@@ -978,6 +1277,18 @@ print(result);  // Prints: "Hello World"
 let text = "Hello";
 let len = length(text);
 print(len);  // Prints: 5
+```
+
+If the argument is not a string, it will result in a type error:
+
+```rust
+let len = length(42);  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 1, column 11: expected 'String', found 'Int'
 ```
 
 #### Accessing Characters
@@ -989,6 +1300,18 @@ let last_char = char(text, 4);   // Get character at index 4
 
 print(first_char);  // Prints: "H"
 print(last_char);   // Prints: "o"
+```
+
+The paramaters must be a string and an integer index, otherwise it will result in a type error:
+
+```rust
+let invalid = char(42, true);  // Type error
+```
+
+Output:
+
+```
+Error: Type error: Type mismatch at line 1, column 15: expected 'String', found 'Int'
 ```
 
 ### Converting Other Types to Strings
@@ -1029,26 +1352,6 @@ print(message);
 // Prints: "User Alice scored 95 points and passed"
 ```
 
-#### Processing Text Data
-
-```rust
-let words = ["Hello", "beautiful", "world"];
-
-// Build a sentence by concatenating words
-let sentence = words[0] + " " + words[1] + " " + words[2] + "!";
-print(sentence);  // Prints: "Hello beautiful world!"
-
-// Get information about each word
-for word in words {
-    let info = "Word: '" + word + "' has " + toString(length(word)) + " characters";
-    print(info);
-}
-// Prints:
-// "Word: 'Hello' has 5 characters"
-// "Word: 'beautiful' has 9 characters"
-// "Word: 'world' has 5 characters"
-```
-
 #### Working with Complex Data
 
 ```rust
@@ -1068,13 +1371,13 @@ print(profile);
 String operations are type-safe - you can only concatenate strings with strings:
 
 ```rust
-// ✅ This works - both operands are strings
+// This works, both operands are strings
 let result = "Hello" + " World";
 
-// ❌ This would cause a type error - mixing string and int
+// This would cause a type error, mixing string and int
 // let error = "Hello" + 123;
 
-// ✅ This works - convert int to string first
+// This works, convert int to string first
 let correct = "Hello" + toString(123);
 ```
 
@@ -1102,238 +1405,3 @@ let x = 42;
 
 let y = /* inline comment */ 10;
 ```
-
-### Comment Best Practices
-
-```rust
-// Function to calculate the factorial of a number
-let factorial = fn(n) {
-    /*
-     * Base case: factorial of 0 or 1 is 1
-     * Recursive case: n * factorial(n-1)
-     */
-    // Implementation would go here
-    n
-};
-```
-
-## Error Handling
-
-### Compile-Time Errors
-
-Type errors are caught at compile time:
-
-```rust
-let x: Int = true;  // Type error: expected Int, found Bool
-```
-
-### Runtime Errors
-
-Some errors occur at runtime:
-
-```rust
-let empty = [];
-let first = head(empty);  // Runtime error: Cannot get head of empty list
-```
-
-### Error Messages
-
-Corrosion provides clear error messages with source location:
-
-```
-Error: Runtime error at line 2, column 13: Cannot get head of empty list
-```
-
-## Advanced Topics
-
-### Recursive Data Structures
-
-While not explicitly covered in basic syntax, you can work with recursive structures using the existing types:
-
-```rust
-// Binary tree represented as nested pairs
-// Left child, Right child, or empty list for leaf
-let leaf = [];
-let tree = (1, (leaf, leaf));  // Node with value 1 and no children
-```
-
-### Functional Programming Patterns
-
-#### Map-like Operations with Loops
-
-```rust
-// Transform each element in a list using loops
-let transform_with_loop = fn(f) {
-    fn(list) {
-        // Process each element
-        for item in list {
-            let transformed = f(item);
-            print(transformed);
-        };
-    }
-};
-
-let double = fn(x) { x * 2 };
-let doubler = transform_with_loop(double);
-doubler([1, 2, 3]);  // Prints: 2, 4, 6
-```
-
-#### Recursive Functional Patterns
-
-```rust
-// Apply a function to each element using recursion
-let recursive_map = fix(fn(self) {
-    fn(func) {
-        fn(list) {
-            // Base case would check if list is empty
-            // Recursive case would process head and recurse on tail
-            // (More powerful with conditional expressions)
-            list
-        }
-    }
-});
-
-// Fold-like operations with fixed point
-let recursive_fold = fix(fn(self) {
-    fn(combiner) {
-        fn(initial) {
-            fn(list) {
-                // Would recursively combine elements
-                initial
-            }
-        }
-    }
-});
-```
-
-#### Combining Loops and Recursion
-
-```rust
-// Use recursion to build higher-order loop patterns
-let repeat_n_times = fix(fn(self) {
-    fn(n) {
-        fn(action) {
-            for i in range(0, n) {
-                action(i);
-            };
-        }
-    }
-});
-
-let print_number = fn(x) { print(x); };
-let print_5_times = repeat_n_times(5);
-print_5_times(print_number);  // Prints: 0, 1, 2, 3, 4
-```
-
-#### Advanced Control Flow Patterns
-
-```rust
-// Nested iteration with recursion
-let matrix_processor = fix(fn(self) {
-    fn(processor) {
-        fn(rows) {
-            fn(cols) {
-                for r in range(0, rows) {
-                    for c in range(0, cols) {
-                        let result = processor((r, c));
-                        print(result);
-                    };
-                };
-            }
-        }
-    }
-});
-
-let coordinate_sum = fn(coord) { fst(coord) + snd(coord) };
-let process_3x3 = matrix_processor(coordinate_sum);
-process_3x3(3)(3);  // Prints coordinate sums for 3x3 grid
-```
-
-### Working with Complex Data
-
-#### Processing Lists of Pairs
-
-```rust
-let points = [(1, 2), (3, 4), (5, 6)];
-let first_point = head(points);        // (1, 2)
-let x_coord = fst(first_point);        // 1
-let remaining_points = tail(points);   // [(3, 4), (5, 6)]
-```
-
-#### Nested Function Calls
-
-```rust
-let numbers = [1, 2, 3, 4, 5];
-let without_first = tail(numbers);     // [2, 3, 4, 5]
-let second_element = head(without_first);  // 2
-
-// Or in one expression:
-let second = head(tail(numbers));      // 2
-```
-
-### Performance Considerations
-
-- **Immutability**: All data structures are immutable, which means operations create new structures
-- **List Operations**: `cons` is O(1), `head` is O(1), `tail` is O(1)
-- **Function Calls**: Functions capture their environment (closures)
-
-### Common Patterns
-
-#### Checking List Contents
-
-```rust
-let numbers = [1, 2, 3];
-// Check if list is empty by trying operations that would error
-// (In a full implementation, you'd have better ways to check)
-```
-
-#### Building Complex Structures
-
-```rust
-// Building a list of pairs
-let pairs = [(1, 2), (3, 4)];
-let new_pair = (5, 6);
-let extended_pairs = cons(new_pair, pairs);  // [(5, 6), (1, 2), (3, 4)]
-```
-
-#### Function Composition
-
-```rust
-let add_one = fn(x) { x + 1 };
-let multiply_two = fn(x) { x * 2 };
-
-// Compose functions
-let add_then_multiply = fn(x) { multiply_two(add_one(x)) };
-let result = add_then_multiply(5);  // (5 + 1) * 2 = 12
-```
-
-## Next Steps
-
-Now that you've learned the Corrosion language basics:
-
-1. **Experiment**: Try the examples in the REPL
-2. **Build Programs**: Create `.corr` files with more complex logic
-3. **Explore**: Combine different features to build interesting programs
-4. **Learn More**: Study functional programming concepts to get the most out of Corrosion
-
-## Summary
-
-Corrosion is a functional programming language with:
-
-- **Static typing** with type inference
-- **Immutable data structures** (lists, pairs)
-- **First-class functions** with closures
-- **Recursion support** via fixed point operator
-- **Control flow** with for loops and range iteration
-- **Pattern matching** through destructuring operations
-- **Interactive development** via REPL
-
-The language combines functional programming principles with practical control flow constructs, enabling both elegant recursive algorithms and efficient iterative processing. The fixed point operator allows for sophisticated recursive patterns, while for loops provide straightforward iteration over collections and ranges.
-
-Key features for different programming styles:
-
-- **Functional**: Use `fix` for recursion, higher-order functions, and function composition
-- **Iterative**: Use `for` loops with `range` for processing sequences
-- **Hybrid**: Combine both approaches for complex data processing patterns
-
-The type system ensures safety across all these paradigms. Happy coding!
