@@ -12,14 +12,15 @@ Welcome to the Corrosion programming language! This tutorial will guide you thro
 6. [Data Structures](#data-structures)
 7. [List Operations](#list-operations)
 8. [Pair Operations](#pair-operations)
-9. [Control Flow](#control-flow)
-10. [Recursion](#recursion)
-11. [Type System](#type-system)
-12. [Output](#output)
-13. [String Operations](#string-operations)
-14. [Comments](#comments)
-15. [Error Handling](#error-handling)
-16. [Advanced Topics](#advanced-topics)
+9. [Sum Types](#sum-types)
+10. [Control Flow](#control-flow)
+11. [Recursion](#recursion)
+12. [Type System](#type-system)
+13. [Output](#output)
+14. [String Operations](#string-operations)
+15. [Comments](#comments)
+16. [Error Handling](#error-handling)
+17. [Advanced Topics](#advanced-topics)
 
 ## Getting Started
 
@@ -727,6 +728,182 @@ let inner_first = fst(first_pair);  // 1
 let second_pair = snd(nested);   // (3, 4)
 let inner_second = snd(second_pair);  // 4
 ```
+
+## Sum Types
+
+Sum types (also called tagged unions or variant types) represent values that can be one of two different types. They are fundamental to functional programming and enable safe handling of alternative data representations.
+
+### Basic Sum Type Creation
+
+Sum types are created using `inl` (left injection) and `inr` (right injection):
+
+```rust
+// Create left injection (first type)
+let number_value = inl(42);
+print(number_value);  // Prints: Left(42)
+
+// Create right injection (second type)
+let text_value = inr("hello");
+print(text_value);    // Prints: Right(hello)
+
+// Check their types
+print(type(number_value));  // Prints: (Int + String)
+print(type(text_value));    // Prints: (Int + String)
+```
+
+Output:
+
+```rust
+Left(42)
+Right(hello)
+(Int + Unknown)
+(Unknown + String)
+```
+
+### Pattern Matching with Case Expressions
+
+The real power of sum types comes from pattern matching using `case` expressions:
+
+```rust
+let value = inl(100);
+
+// Pattern match to extract and use the value
+let result = case value of
+    inl number => number * 2
+    | inr text => 0;
+
+print("Original value:");
+print(value);           // Prints: Left(100)
+print("Processed result:");
+print(result);          // Prints: 200
+```
+
+Output:
+
+```rust
+Original value:
+Left(100)
+Processed result:
+200
+```
+
+#### Case Expression Syntax
+
+The `case` expression has this structure:
+
+```rust
+case expression of
+    inl pattern_variable => left_branch_expression
+    | inr pattern_variable => right_branch_expression
+```
+
+- **Expression**: The sum type value to match
+- **Pattern variables**: Names to bind the extracted values
+- **Branches**: Different code paths for left and right cases
+
+### Practical Sum Type Patterns
+
+#### Error Handling
+
+Sum types are excellent for representing operations that can succeed or fail:
+
+```rust
+// Simulate a division operation
+let division_success = inl(10);  // Successful result
+let division_error = inr("Division by zero");  // Error case
+
+// Handle both success and error cases
+let process_result = fn(result) {
+    case result of
+        inl value => value + 5
+        | inr error => 0  // Default value for errors
+};
+
+print("Success case:");
+print(process_result(division_success));  // Prints: 15
+
+print("Error case:");
+print(process_result(division_error));    // Prints: 0
+```
+
+Output:
+
+```rust
+Success case:
+15
+Error case:
+0
+```
+
+### Functions with Sum Type Parameters
+
+Sum types work seamlessly with functions that take sum type parameters:
+
+```rust
+// Function that takes a sum type parameter and uses case matching
+let process_value = fn(param) {
+    case param of
+        inl text => "Function received string: " + text
+        | inr number => "Function received number: " + toString(number)
+};
+
+// Test with different sum type values
+let string_example = inl("world");
+let number_example = inr(42);
+
+print(process_value(string_example));  // Prints: Function received string: world
+print(process_value(number_example));  // Prints: Function received number: 42
+```
+
+Output:
+
+```rust
+Function received string: world
+Function received number: 42
+```
+
+#### Error Handling with Functions
+
+```rust
+// Function that handles result or error cases
+let handle_result = fn(result) {
+    case result of
+        inl success => "SUCCESS: " + toString(success)
+        | inr error => "ERROR: " + error
+};
+
+let success_case = inl(100);
+let error_case = inr("File not found");
+
+print(handle_result(success_case));  // Prints: SUCCESS: 100
+print(handle_result(error_case));    // Prints: ERROR: File not found
+```
+
+### Type Annotations for Sum Types
+
+Sum types are often inferred automatically, especially in function contexts:
+
+```rust
+// Type is automatically inferred from usage
+let process_either = fn(value) {
+    case value of
+        inl text => "Got: " + text
+        | inr num => "Got: " + toString(num)
+};
+
+// The function automatically accepts sum types
+print(process_either(inl("hello")));  // Works!
+print(process_either(inr(42)));       // Works!
+```
+
+Explicit type annotations can be added when needed:
+
+```rust
+// Explicit sum type annotation
+let result: (Int + String) = inl(42);
+```
+
+**Note**: Currently, function parameter type annotations for sum types require the type system to be able to infer the sum type structure from the function body's case expression. The type inference works best when the function parameter is used directly in a case expression.
 
 ## Control Flow
 

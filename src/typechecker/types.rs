@@ -33,10 +33,9 @@ impl Type {
         match (self, other) {
             (Type::Error, _) | (_, Type::Error) => true, // Error type is compatible with anything
             (Type::Unknown, _) | (_, Type::Unknown) => true, // Unknown can be inferred
-            // Allow list types with unknown elements to be compatible
-            (Type::List { element: e1 }, Type::List { element: e2 }) => {
-                e1.is_assignable_to(e2) || e2.is_assignable_to(e1)
-            }
+            // For complex types like lists, require exact structural equality for now
+            // This prevents List Unknown from being automatically assignable to List Int
+            (Type::List { element: e1 }, Type::List { element: e2 }) => e1 == e2,
             (a, b) => a == b, // For now, require exact match. Can be extended for subtyping
         }
     }

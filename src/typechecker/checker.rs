@@ -479,7 +479,9 @@ impl TypeChecker {
                             .types_compatible(&argument_typed.ty, &refined_param)
                             || (argument_typed.ty == Type::Unknown
                                 && matches!(refined_param, Type::List { .. }))
-                            || matches!(&argument_typed.ty, Type::List { element } if **element == Type::Unknown);
+                            || matches!(&argument_typed.ty, Type::List { element } if **element == Type::Unknown)
+                            || matches!(&argument_typed.ty, Type::Sum { left, right } if **left == Type::Unknown || **right == Type::Unknown)
+                            || matches!(&refined_param, Type::Sum { left, right } if **left == Type::Unknown || **right == Type::Unknown);
 
                         if is_compatible {
                             Ok(TypedExpression::new(refined_result, span.clone()))
@@ -1195,6 +1197,19 @@ impl TypeChecker {
             (Type::Unknown, Type::List { .. }) => context.clone(),
             // If context has Unknown but original is more specific, prefer original
             (original_type, Type::Unknown) => original_type.clone(),
+            // Handle Sum types with Unknown components
+            (
+                Type::Sum { left, right },
+                Type::Sum {
+                    left: context_left,
+                    right: context_right,
+                },
+            ) => Type::Sum {
+                left: Box::new(self.refine_type_with_context(left, context_left)),
+                right: Box::new(self.refine_type_with_context(right, context_right)),
+            },
+            // If original is Unknown but context suggests Sum, use Sum
+            (Type::Unknown, Type::Sum { .. }) => context.clone(),
             (Type::Function { param, result }, _) => Type::Function {
                 param: Box::new(self.refine_type_with_context(param, &Type::Unknown)),
                 result: Box::new(self.refine_type_with_context(result, &Type::Unknown)),
@@ -1236,6 +1251,18 @@ impl TypeChecker {
                     second: s2,
                 },
             ) => self.types_compatible(f1, f2) && self.types_compatible(s1, s2),
+
+            // Sum types are compatible if their left and right types are compatible
+            (
+                Type::Sum {
+                    left: l1,
+                    right: r1,
+                },
+                Type::Sum {
+                    left: l2,
+                    right: r2,
+                },
+            ) => self.types_compatible(l1, l2) && self.types_compatible(r1, r2),
 
             // Otherwise, use structural equality
             _ => t1 == t2,
@@ -1540,6 +1567,28 @@ impl TypeChecker {
                     self.analyze_parameter_usage(param, list)
                 }
             }
+            Expression::Case {
+                expression,
+                left_body,
+                right_body,
+                ..
+            } => {
+                // If parameter is used in case expression, it should be a sum type
+                if self.expression_uses_parameter(param, expression) {
+                    // Parameter is being case-matched, so it must be a sum type
+                    // We need to infer the types from the branches
+                    return Some(Type::Sum {
+                        left: Box::new(Type::Unknown),
+                        right: Box::new(Type::Unknown),
+                    });
+                }
+
+                // Check if parameter is used in the branches
+                let left_usage = self.analyze_parameter_usage(param, left_body);
+                let right_usage = self.analyze_parameter_usage(param, right_body);
+
+                left_usage.or(right_usage)
+            }
             Expression::Block {
                 statements,
                 expression,
@@ -1583,6 +1632,16 @@ impl TypeChecker {
             }
             Expression::HeadProjection { list, .. } => self.expression_uses_parameter(param, list),
             Expression::TailProjection { list, .. } => self.expression_uses_parameter(param, list),
+            Expression::Case {
+                expression,
+                left_body,
+                right_body,
+                ..
+            } => {
+                self.expression_uses_parameter(param, expression)
+                    || self.expression_uses_parameter(param, left_body)
+                    || self.expression_uses_parameter(param, right_body)
+            }
             Expression::Block {
                 statements,
                 expression,
