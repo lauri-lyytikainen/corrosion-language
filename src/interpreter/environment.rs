@@ -43,6 +43,14 @@ impl Environment {
         }
     }
 
+    /// Update a variable's value in the current scope (for recursive functions)
+    /// This should only be called for variables that are already bound in the current scope
+    pub fn update(&mut self, name: String, value: Value) {
+        if let Some(current_scope) = self.scopes.last_mut() {
+            current_scope.insert(name, value);
+        }
+    }
+
     /// Get all bindings from the current environment (for module exports)
     pub fn get_all_bindings(&self) -> HashMap<String, Value> {
         let mut all_bindings = HashMap::new();

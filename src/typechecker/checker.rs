@@ -262,21 +262,33 @@ impl TypeChecker {
                     });
                 }
 
-                // Create a new scope for the function body
-                self.environment.enter_scope();
-
-                // If there's a return type annotation, use it; otherwise infer
-                let expected_return_type = return_type
-                    .as_ref()
-                    .map(|rt| self.convert_type_expression(rt))
-                    .transpose()?;
-
                 // Use explicit parameter type if provided, otherwise Unknown for inference
                 let param_type = if let Some(param_type_expr) = param_type {
                     self.convert_type_expression(param_type_expr)?
                 } else {
                     Type::Unknown
                 };
+
+                // Convert return type annotation if provided
+                let expected_return_type = return_type
+                    .as_ref()
+                    .map(|rt| self.convert_type_expression(rt))
+                    .transpose()?;
+
+                // Create preliminary function type for recursive calls
+                // Use Unknown for return type if not annotated (will be refined later)
+                let preliminary_return_type = expected_return_type.clone().unwrap_or(Type::Unknown);
+                let preliminary_function_type =
+                    Type::function(param_type.clone(), preliminary_return_type);
+
+                // Bind the function name BEFORE checking the body (enables recursion)
+                self.environment
+                    .bind(name.clone(), preliminary_function_type);
+
+                // Create a new scope for the function body
+                self.environment.enter_scope();
+
+                // Bind the parameter in the function body scope
                 self.environment.bind(param.clone(), param_type.clone());
 
                 // Type check the function body
@@ -300,11 +312,10 @@ impl TypeChecker {
 
                 self.environment.exit_scope();
 
-                // Create function type
-                let function_type = Type::function(param_type.clone(), final_return_type.clone());
-
-                // Bind the function name to its type
-                self.environment.bind(name.clone(), function_type);
+                // Update the function type with the actual return type
+                let final_function_type =
+                    Type::function(param_type.clone(), final_return_type.clone());
+                self.environment.update(name.clone(), final_function_type);
 
                 Ok(TypedStatement::FunctionDeclaration {
                     name: name.clone(),
@@ -414,6 +425,17 @@ impl TypeChecker {
                         } else {
                             Err(TypeError::TypeMismatch {
                                 expected: Type::Bool,
+                                found: typed_operand.ty,
+                                span: span.clone(),
+                            })
+                        }
+                    }
+                    crate::ast::nodes::UnaryOperator::Negate => {
+                        if typed_operand.ty == Type::Int {
+                            Ok(TypedExpression::new(Type::Int, span.clone()))
+                        } else {
+                            Err(TypeError::TypeMismatch {
+                                expected: Type::Int,
                                 found: typed_operand.ty,
                                 span: span.clone(),
                             })

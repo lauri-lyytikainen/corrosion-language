@@ -1,0 +1,48 @@
+// Implement two functions:
+// 1. `filter`: Takes a predicate function and a list, returns a new list with only elements that satisfy the predicate
+// 2. `sumEvens`: Uses your `filter` function to sum only the even numbers from a list
+
+fn isEven(n: Int) -> Bool {
+    n - (n / 2) * 2 == 0
+}
+
+fn filter(predicate) {
+    fn(lst: List Int) {
+        if lst == [] {
+            let empty: List Int = [];
+            empty
+        } else {
+            let first: Int = head(lst);
+            let rest: List Int = tail(lst);
+            let filtered_rest: List Int = filter(predicate)(rest);
+            let passes: Bool = predicate(first);
+            if passes {
+                cons(first, filtered_rest)
+            } else {
+                filtered_rest
+            }
+        }
+    }
+}
+
+fn sumList(numbers: List Int) -> Int {
+    if numbers == [] {
+        0
+    } else {
+        let first: Int = head(numbers);
+        let rest: List Int = tail(numbers);
+        first + sumList(rest)
+    }
+}
+
+fn sumEvens(numbers: List Int) -> Int {
+    let evens: List Int = filter(isEven)(numbers);
+    sumList(evens)
+}
+
+let numbers: List Int = [1, 2, 3, 4, 5, 6];
+let evenNumbers: List Int = filter(isEven)(numbers);
+let sumOfEvens: Int = sumEvens(numbers);
+
+print("Even numbers: " + toString(evenNumbers)); // Expected output: [2, 4, 6]
+print("Sum of even numbers: " + toString(sumOfEvens)); // Expected output: 12

@@ -1,0 +1,22 @@
+// Exercise 1: List Sum Calculator
+// Write a program that takes a list of integers as input and calculates the sum of all the integers in the list.
+// If the list is empty, the program should return 0.
+
+let input1: List Int = [1, 2, 3, 4, 5];
+let input2: List Int = [];
+
+fn sumList(numbers: List Int) -> Int {
+    if numbers == [] {
+        0
+    } else {
+        let first: Int = head(numbers);
+        let rest: List Int = tail(numbers);
+        first + sumList(rest)
+    }
+}
+
+let result1: Int = sumList(input1);
+let result2: Int = sumList(input2);
+
+print("Sum of input1: " + toString(result1)); // Expected output: 15
+print("Sum of input2: " + toString(result2)); // Expected output: 0

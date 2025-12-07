@@ -1,0 +1,21 @@
+// Write a function `longerString` that takes two strings and returns the one that is longer.
+// If they are the same length, return the first string.
+
+fn longerString(strs: (String, String)) -> String {
+    if length(fst(strs)) >= length(snd(strs)) {
+        fst(strs)
+    } else {
+        snd(strs)
+    }
+}
+
+let string1: String = "hello";
+let string2: String = "world!";
+
+let result: String = longerString((string1, string2));
+print("Longer string: " + result); // Expected output: "world!"
+
+let string3: String = "cat";
+let string4: String = "dog";
+let result2: String = longerString((string3, string4));
+print("Longer string: " + result2); // Expected output: "cat"

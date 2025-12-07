@@ -250,6 +250,7 @@ pub enum Expression {
 #[derive(Debug, Clone, PartialEq)]
 pub enum UnaryOperator {
     LogicalNot,
+    Negate, // Unary minus for negation
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -273,6 +274,7 @@ impl From<Token> for UnaryOperator {
     fn from(token: Token) -> Self {
         match token {
             Token::LogicalNot => UnaryOperator::LogicalNot,
+            Token::Minus => UnaryOperator::Negate,
             _ => panic!("Invalid unary operator token: {:?}", token),
         }
     }

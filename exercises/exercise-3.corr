@@ -1,0 +1,33 @@
+//Write three functions:
+
+// 1. `swapPair`: Takes a pair `(a, b)` and returns a new pair `(b, a)` with elements swapped
+// 2. `abs`: Takes an integer `n` and returns its absolute value
+// 3. `distance`: Takes a pair of integers `(x, y)` representing coordinates and calculates the Manhattan distance from origin (0, 0), which is `|x| + |y|`
+
+fn swapPair(pair: (Int, Int)) -> (Int, Int) {
+    let first: Int = fst(pair);
+    let second: Int = snd(pair);
+    (second, first)
+}
+
+fn abs(n: Int) -> Int {
+    if n < 0 {
+        -n
+    } else {
+        n
+    }
+}
+
+fn distance(coords: (Int, Int)) -> Int {
+    let x: Int = fst(coords);
+    let y: Int = snd(coords);
+    abs(x) + abs(y)
+}
+
+let pair: (Int, Int) = (3, 7);  
+
+let swapped: (Int, Int) = swapPair(pair);
+print("Swapped pair: (" + toString(fst(swapped)) + ", " + toString(snd(swapped)) + ")"); // Expected output: (7, 3)
+let coords: (Int, Int) = (-4, 5);
+let dist: Int = distance(coords);
+print("Distance from origin: " + toString(dist)); // Expected output: 9

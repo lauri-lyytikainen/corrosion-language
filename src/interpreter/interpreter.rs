@@ -65,12 +65,26 @@ impl Interpreter {
             Statement::FunctionDeclaration {
                 name, param, body, ..
             } => {
-                // Create a function value and bind it to the name
-                let function_val = Value::Function {
-                    param: param.clone(),
-                    body: Box::new(body.clone()),
+                // For recursive functions, wrap them in a FixedPoint automatically
+                // This allows the function to reference itself without explicit fix()
+
+                // Create the inner function that takes the recursive reference
+                let recursive_function = Value::Function {
+                    param: name.clone(), // The recursive reference parameter
+                    body: Box::new(Expression::Function {
+                        param: param.clone(),
+                        param_type: None,
+                        body: Box::new(body.clone()),
+                        span: body.span().clone(),
+                    }),
                     env: self.environment.clone(),
                 };
+
+                // Wrap it in a FixedPoint
+                let function_val = Value::FixedPoint {
+                    function: Box::new(recursive_function),
+                };
+
                 self.environment.bind(name.clone(), function_val);
                 Ok(Value::Unit)
             }
@@ -220,6 +234,14 @@ impl Interpreter {
                         Value::Bool(b) => Ok(Value::Bool(!b)),
                         _ => Err(InterpreterError::TypeError {
                             expected: "Bool".to_string(),
+                            found: operand_val.type_name().to_string(),
+                            span: span.clone(),
+                        }),
+                    },
+                    crate::ast::nodes::UnaryOperator::Negate => match operand_val {
+                        Value::Int(n) => Ok(Value::Int(-n)),
+                        _ => Err(InterpreterError::TypeError {
+                            expected: "Int".to_string(),
                             found: operand_val.type_name().to_string(),
                             span: span.clone(),
                         }),
@@ -837,7 +859,11 @@ impl Interpreter {
                 result
             }
             Value::Pair(first, second) => {
-                format!("({}, {})", self.format_for_print(first), self.format_for_print(second))
+                format!(
+                    "({}, {})",
+                    self.format_for_print(first),
+                    self.format_for_print(second)
+                )
             }
             Value::Function { param, .. } => format!("<function {}>", param),
             Value::LeftInject(val) => format!("Left({})", self.format_for_print(val)),

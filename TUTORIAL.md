@@ -1,6 +1,6 @@
 # Corrosion Language Tutorial
 
-Welcome to the Corrosion programming language! This tutorial will guide you through all the language features, from basic syntax to advanced functional programming concepts.
+Welcome to the Corrosion programming language! This tutorial will guide you through all the language features.
 
 ## Table of Contents
 
@@ -1239,9 +1239,88 @@ The fixed point operator implements the Y-combinator:
 - This enables recursive function definitions without explicit self-reference
 - The pattern `fix(fn(self) { ... })` allows the function to call itself via `self`
 
-#### Recursive Patterns
+#### Recursive Function Declarations (Alternative Syntax)
 
-While Corrosion doesn't yet have conditional expressions, you can build recursive structures:
+In addition to using `fix()` explicitly, Corrosion supports recursive function declarations with the `fn` keyword. Named functions automatically wrap themselves in a fixed point, allowing direct recursion:
+
+```rust
+// Method 1: Explicit fix (original way)
+let factorial_fix = fix(fn(self) {
+    fn(n: Int) {
+        if n == 0 {
+            1
+        } else {
+            n * self(n - 1)
+        }
+    }
+});
+
+// Method 2: Named function declaration (simpler syntax)
+fn factorial(n: Int) -> Int {
+    if n == 0 {
+        1
+    } else {
+        n * factorial(n - 1)  // Direct recursion!
+    }
+}
+
+// Both work identically
+print(factorial_fix(5));  // Prints: 120
+print(factorial(5));      // Prints: 120
+```
+
+Output:
+
+```rust
+120
+120
+```
+
+**Key Points:**
+
+- Named function declarations (`fn name(param) { ... }`) automatically support recursion
+- Under the hood, they use the same Y-combinator mechanism as `fix()`
+- Both syntaxes are fully compatible and can be used in the same program
+- Use `fix()` for advanced patterns; use `fn` declarations for simple recursive functions
+
+#### Comparing Recursion Styles
+
+```rust
+// Example: Sum of a list
+
+// Using fix (explicit Y-combinator)
+let sum_fix = fix(fn(self) {
+    fn(lst: List Int) {
+        if lst == [] {
+            0
+        } else {
+            head(lst) + self(tail(lst))
+        }
+    }
+});
+
+// Using fn declaration (automatic recursion support)
+fn sum_fn(lst: List Int) -> Int {
+    if lst == [] {
+        0
+    } else {
+        head(lst) + sum_fn(tail(lst))
+    }
+}
+
+let numbers: List Int = [1, 2, 3, 4, 5];
+print(sum_fix(numbers));   // Prints: 15
+print(sum_fn(numbers));    // Prints: 15
+```
+
+Output:
+
+```rust
+15
+15
+```
+
+#### Recursive Patterns
 
 ```rust
 // Simple recursive patterns work well

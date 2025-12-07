@@ -337,7 +337,7 @@ impl Parser {
 
         // Check if this is a unary operator
         let token = &self.peek().token;
-        if matches!(token, Token::LogicalNot) {
+        if matches!(token, Token::LogicalNot | Token::Minus) {
             let operator_token = self.advance();
             let operator_span = operator_token.span.clone();
             let operator = UnaryOperator::from(operator_token.token.clone());

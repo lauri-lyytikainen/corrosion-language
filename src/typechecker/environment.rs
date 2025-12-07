@@ -30,6 +30,12 @@ impl Environment {
         self.bindings.insert(name, ty);
     }
 
+    /// Update a variable's type in the current scope (for recursive functions)
+    /// This should only be called for variables that are already bound in the current scope
+    pub fn update(&mut self, name: String, ty: Type) {
+        self.bindings.insert(name, ty);
+    }
+
     /// Look up a variable type, searching parent scopes if necessary
     pub fn lookup(&self, name: &str) -> Option<&Type> {
         self.bindings
