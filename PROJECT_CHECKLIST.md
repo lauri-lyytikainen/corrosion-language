@@ -31,9 +31,9 @@ This checklist organizes the requirements and points from the project handout. T
 
 ### 2.2 Exercises (200p)
 
-- [ ] Problem statements, handouts, and solution code for at least five programming exercises.
-- [ ] Each programming exercise focuses on a different feature of the language.
-- [ ] The exercises must be different from the tutorial examples.
+- [x] Problem statements, handouts, and solution code for at least five programming exercises.
+- [x] Each programming exercise focuses on a different feature of the language.
+- [x] The exercises must be different from the tutorial examples.
 
 ---
 
