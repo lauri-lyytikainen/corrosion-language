@@ -4,25 +4,24 @@ Welcome to the Corrosion programming language! This tutorial will guide you thro
 
 ## Table of Contents
 
-1. [Getting Started](#getting-started)
-2. [Basic Syntax](#basic-syntax)
-3. [Variables and Types](#variables-and-types)
-4. [Expressions and Operations](#expressions-and-operations)
-5. [Functions](#functions)
-6. [Data Structures](#data-structures)
-7. [List Operations](#list-operations)
-8. [Pair Operations](#pair-operations)
-9. [Sum Types](#sum-types)
-10. [Control Flow](#control-flow)
-11. [Recursion](#recursion)
-12. [Type System](#type-system)
-13. [Output](#output)
-14. [String Operations](#string-operations)
-15. [Comments](#comments)
-16. [Error Handling](#error-handling)
-17. [Advanced Topics](#advanced-topics)
+1. [Getting Started](#1-getting-started)
+2. [Basic Syntax](#2-basic-syntax)
+3. [Variables and Types](#3-variables-and-types)
+4. [Expressions and Operations](#4-expressions-and-operations)
+5. [Functions](#5-functions)
+6. [Data Structures](#6-data-structures)
+7. [List Operations](#7-list-operations)
+8. [Pair Operations](#8-pair-operations)
+9. [Sum Types](#9-sum-types)
+10. [Control Flow](#10-control-flow)
+11. [Recursion](#11-recursion)
+12. [Type System](#12-type-system)
+13. [Output](#13-output)
+14. [String Operations](#14-string-operations)
+15. [Comments](#15-comments)
+16. [Modules and Imports](#16-modules-and-imports)
 
-## Getting Started
+## 1. Getting Started
 
 ### Running the REPL
 
@@ -42,7 +41,7 @@ You can also save code in `.corr` files and run them:
 cargo run program.corr
 ```
 
-## Basic Syntax
+## 2. Basic Syntax
 
 ### Keywords
 
@@ -118,7 +117,7 @@ Output:
 Error: Parse error: Unexpected token at line 1, column 7: expression, found RightParen
 ```
 
-## Variables and Types
+## 3. Variables and Types
 
 ### Variable Declaration
 
@@ -193,7 +192,7 @@ Output:
 Error: Type error: Variable 'x' redefined at line 2, column 1
 ```
 
-## Expressions and Operations
+## 4. Expressions and Operations
 
 ### Arithmetic Operations
 
@@ -277,7 +276,7 @@ Output:
 20
 ```
 
-## Functions
+## 5. Functions
 
 ### Function Definition
 
@@ -441,7 +440,7 @@ fn process_numbers(values: List Int) { /* processing */ }
 let double = fn(x) { x * 2 };  // Type is inferred as Int -> Int
 ```
 
-## Data Structures
+## 6. Data Structures
 
 ### Lists
 
@@ -506,7 +505,7 @@ Output:
 Error: Parse error: Unexpected token at line 1, column 25: Expected ')' after pair, found Comma
 ```
 
-## List Operations
+## 7. List Operations
 
 ### `cons` - Prepending Elements
 
@@ -659,7 +658,7 @@ let two_items = cons(2, one_item);      // [2, 1]
 let three_items = cons(3, two_items);   // [3, 2, 1]
 ```
 
-## Pair Operations
+## 8. Pair Operations
 
 ### `fst` - Getting the First Element
 
@@ -729,7 +728,7 @@ let second_pair = snd(nested);   // (3, 4)
 let inner_second = snd(second_pair);  // 4
 ```
 
-## Sum Types
+## 9. Sum Types
 
 Sum types (also called tagged unions or variant types) represent values that can be one of two different types. They are fundamental to functional programming and enable safe handling of alternative data representations.
 
@@ -905,7 +904,7 @@ let result: (Int + String) = inl(42);
 
 **Note**: Currently, function parameter type annotations for sum types require the type system to be able to infer the sum type structure from the function body's case expression. The type inference works best when the function parameter is used directly in a case expression.
 
-## Control Flow
+## 10. Control Flow
 
 ### If Expressions
 
@@ -1148,7 +1147,7 @@ Error: Type error: Type mismatch at line 1, column 1: expected 'Int', found 'Boo
 
 **Note**: The `range` function is exclusive of the end value, meaning `range(1, 4)` produces `[1, 2, 3]`.
 
-## Recursion
+## 11. Recursion
 
 ### Fixed Point Operator
 
@@ -1366,7 +1365,7 @@ Output:
 13
 ```
 
-## Type System
+## 12. Type System
 
 ### Basic Types
 
@@ -1438,7 +1437,7 @@ let y = true;
 // let result = x + y;  // Error: Cannot add Int and Bool
 ```
 
-## Output
+## 13. Output
 
 ### Print Statement
 
@@ -1465,7 +1464,7 @@ print(head(numbers)); // Prints: 1
 print(tail(numbers)); // Prints: [2, 3]
 ```
 
-## String Operations
+## 14. String Operations
 
 ### String Literals
 
@@ -1637,7 +1636,7 @@ let result = "Hello" + " World";
 let correct = "Hello" + toString(123);
 ```
 
-## Comments
+## 15. Comments
 
 ### Single-Line Comments
 
@@ -1660,4 +1659,78 @@ Use `/* */` for multi-line comments:
 let x = 42;
 
 let y = /* inline comment */ 10;
+```
+
+## 16. Modules and Imports
+
+Corrosion supports modular programming through the import system, allowing you to split your code into multiple files and reuse code across different programs.
+
+### Basic Import Syntax
+
+Import another Corrosion file using the `import` statement:
+
+```rust
+import "filename.corr" as alias;
+```
+
+The imported module is given an alias, and you access its exported functions and variables using the `alias.member` syntax.
+
+### Creating a Module
+
+Any `.corr` file can act as a module. All top-level declarations (functions and variables) are automatically exported:
+
+**File: `math-helpers.corr`**
+
+```rust
+// Math utility functions
+fn square(x: Int) -> Int {
+    x * x
+}
+
+fn add(a: Int) -> (Int -> Int) {
+    fn(b: Int) {
+        a + b
+    }
+}
+
+let PI = 3;
+```
+
+### Importing and Using a Module
+
+**File: `main.corr`**
+
+```rust
+import "math-helpers.corr" as math;
+
+print("Using imported functions:");
+print(math.square(5));      // 25
+print(math.add(10)(20));    // 30
+print(math.PI);             // 3
+```
+
+Output:
+
+```rust
+Using imported functions:
+25
+30
+3
+```
+
+### Module Access Syntax
+
+Access module members using the dot notation:
+
+```rust
+import "utilities.corr" as utils;
+
+// Access variables
+let constant = utils.MY_CONSTANT;
+
+// Call functions
+let result = utils.helper_function(42);
+
+// Chain with other operations
+let doubled = utils.double(utils.triple(5));
 ```
