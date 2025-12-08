@@ -219,7 +219,6 @@ pub enum TypedStatement {
     },
 }
 
-/// Type-checked program
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypedProgram {
     pub statements: Vec<TypedStatement>,
@@ -233,7 +232,6 @@ impl TypedProgram {
 }
 
 impl Type {
-    /// Helper to create function type
     pub fn function(param: Type, result: Type) -> Type {
         Type::Function {
             param: Box::new(param),
@@ -241,7 +239,6 @@ impl Type {
         }
     }
 
-    /// Helper to create pair type
     pub fn pair(first: Type, second: Type) -> Type {
         Type::Pair {
             first: Box::new(first),
@@ -249,14 +246,12 @@ impl Type {
         }
     }
 
-    /// Helper to create list type
     pub fn list(element: Type) -> Type {
         Type::List {
             element: Box::new(element),
         }
     }
 
-    /// Helper to create sum type
     pub fn sum(left: Type, right: Type) -> Type {
         Type::Sum {
             left: Box::new(left),
@@ -264,7 +259,6 @@ impl Type {
         }
     }
 
-    /// Helper to create recursive type
     pub fn recursive(inner: Type) -> Type {
         Type::Recursive {
             inner: Box::new(inner),

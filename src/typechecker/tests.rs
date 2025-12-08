@@ -2,7 +2,7 @@
 mod tests {
     use crate::ast::{Expression, Program, Statement};
     use crate::lexer::tokens::Span;
-    use crate::typechecker::checker::TypeError;
+    use crate::typechecker::TypeError;
     use crate::typechecker::{BinaryOp, Environment, Type, TypeChecker, TypedStatement};
 
     fn create_test_span() -> Span {
@@ -206,10 +206,6 @@ mod tests {
         }
     }
 
-    // ======================
-    // BASIC TYPES TESTS
-    // ======================
-
     #[test]
     fn test_basic_integer_types() {
         let mut checker = TypeChecker::new();
@@ -312,10 +308,6 @@ mod tests {
         }
     }
 
-    // ======================
-    // FUNCTION TYPES TESTS
-    // ======================
-
     #[test]
     fn test_function_type_creation() {
         // Simple function type: Int -> Int
@@ -371,10 +363,6 @@ mod tests {
         assert_eq!(format!("{}", complex_func_type), "(Int -> (Bool -> Int))");
     }
 
-    // ======================
-    // PAIR TYPES TESTS
-    // ======================
-
     #[test]
     fn test_pair_type_creation() {
         // Integer pair
@@ -422,10 +410,6 @@ mod tests {
         let nested_pair = Type::pair(Type::pair(Type::Int, Type::Int), Type::Bool);
         assert_eq!(format!("{}", nested_pair), "((Int, Int), Bool)");
     }
-
-    // ======================
-    // LIST TYPES TESTS
-    // ======================
 
     #[test]
     fn test_list_type_creation() {
@@ -495,10 +479,6 @@ mod tests {
         assert_eq!(format!("{}", pair_list), "List (Int, Bool)");
     }
 
-    // ======================
-    // SUM TYPES TESTS
-    // ======================
-
     #[test]
     fn test_sum_type_creation() {
         // Either integer or boolean
@@ -567,10 +547,6 @@ mod tests {
         assert_eq!(format!("{}", nested_sum), "((Int + Bool) + List Int)");
     }
 
-    // ======================
-    // RECURSIVE TYPES TESTS
-    // ======================
-
     #[test]
     fn test_recursive_type_creation() {
         // Simple recursive type
@@ -625,10 +601,6 @@ mod tests {
         let nat_type = Type::recursive(Type::sum(Type::Bool, Type::recursive(Type::Int)));
         assert_eq!(format!("{}", nat_type), "Rec (Bool + Rec Int)");
     }
-
-    // ======================
-    // COMPLEX COMBINATIONS TESTS
-    // ======================
 
     #[test]
     fn test_higher_order_function_types() {
@@ -710,10 +682,6 @@ mod tests {
         );
     }
 
-    // ======================
-    // TYPE COMPATIBILITY TESTS
-    // ======================
-
     #[test]
     fn test_type_assignability_extended() {
         // Basic type compatibility
@@ -783,10 +751,6 @@ mod tests {
         // Similarly, lists with Unknown elements are not automatically compatible with concrete types
         assert!(!list_with_unknown.is_assignable_to(&list_int));
     }
-
-    // ======================
-    // BINARY OPERATIONS EXTENDED TESTS
-    // ======================
 
     #[test]
     fn test_arithmetic_operations_comprehensive() {
@@ -870,10 +834,6 @@ mod tests {
         );
     }
 
-    // ======================
-    // TYPE MISMATCH ERROR TESTS
-    // ======================
-
     #[test]
     fn test_type_mismatch_in_variable_declaration() {
         let mut checker = TypeChecker::new();
@@ -939,10 +899,6 @@ mod tests {
             }
         }
     }
-
-    // ======================
-    // DISPLAY FORMAT TESTS
-    // ======================
 
     #[test]
     fn test_complex_type_display_formatting() {

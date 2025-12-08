@@ -5,7 +5,6 @@ use crate::typechecker::checker::TypeChecker;
 
 #[test]
 fn test_sum_type_inference() {
-    // Test if-expression with different types creates sum type
     let source = "let x = if true { 42 } else { false };";
 
     println!("Testing: {}", source);
@@ -23,7 +22,6 @@ fn test_sum_type_inference() {
 
     println!("Type checking passed! Typed AST: {:?}", typed_ast);
 
-    // Now test interpretation with original AST
     let mut interpreter = Interpreter::new();
     let result = interpreter
         .interpret_program(&ast)
@@ -34,7 +32,6 @@ fn test_sum_type_inference() {
 
 #[test]
 fn test_explicit_sum_types() {
-    // Test explicit sum type construction and pattern matching
     let source = r#"
         let left_val = inl(42);
         let result = case left_val of
@@ -57,7 +54,6 @@ fn test_explicit_sum_types() {
 
     println!("Type checking passed! Typed AST: {:?}", typed_ast);
 
-    // Now test interpretation with original AST
     let mut interpreter = Interpreter::new();
     let result = interpreter
         .interpret_program(&ast)

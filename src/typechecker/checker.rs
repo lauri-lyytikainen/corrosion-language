@@ -1,108 +1,15 @@
 use crate::ast::{Expression, Program, Spanned, Statement, TypeExpression};
-use crate::lexer::tokens::Span;
 use crate::typechecker::{
-    BinaryOp, Environment, Type, TypedExpression, TypedProgram, TypedStatement,
+    BinaryOp, Environment, ModuleLoader, Type, TypeCompatibility, TypeError, TypeInference,
+    TypeResult, TypedExpression, TypedProgram, TypedStatement,
 };
-use std::collections::HashMap;
-use std::fs;
-use std::path::{Path, PathBuf};
-
-/// Type checking errors
-#[derive(Debug, Clone)]
-pub enum TypeError {
-    UndefinedVariable {
-        name: String,
-        span: Span,
-    },
-    TypeMismatch {
-        expected: Type,
-        found: Type,
-        span: Span,
-    },
-    InvalidBinaryOperation {
-        left: Type,
-        op: BinaryOp,
-        right: Type,
-        span: Span,
-    },
-    RedefinedVariable {
-        name: String,
-        span: Span,
-    },
-    ImportError {
-        path: String,
-        message: String,
-        span: Span,
-    },
-}
-
-impl std::fmt::Display for TypeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TypeError::UndefinedVariable { name, span } => {
-                write!(
-                    f,
-                    "Undefined variable '{}' at line {}, column {}",
-                    name, span.line, span.column
-                )
-            }
-            TypeError::TypeMismatch {
-                expected,
-                found,
-                span,
-            } => {
-                write!(
-                    f,
-                    "Type mismatch at line {}, column {}: expected '{}', found '{}'",
-                    span.line, span.column, expected, found
-                )
-            }
-            TypeError::InvalidBinaryOperation {
-                left,
-                op,
-                right,
-                span,
-            } => {
-                write!(
-                    f,
-                    "Invalid binary operation at line {}, column {}: '{}' {:?} '{}'",
-                    span.line, span.column, left, op, right
-                )
-            }
-            TypeError::RedefinedVariable { name, span } => {
-                write!(
-                    f,
-                    "Variable '{}' redefined at line {}, column {}",
-                    name, span.line, span.column
-                )
-            }
-            TypeError::ImportError {
-                path,
-                message,
-                span,
-            } => {
-                write!(
-                    f,
-                    "Import error at line {}, column {}: {} (path: {})",
-                    span.line, span.column, message, path
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for TypeError {}
-
-pub type TypeResult<T> = Result<T, TypeError>;
+use std::path::Path;
 
 /// Type checker for the Corrosion language
 pub struct TypeChecker {
     environment: Environment,
     errors: Vec<TypeError>,
-    /// Current directory for resolving imports
-    current_directory: PathBuf,
-    /// Cache of loaded modules
-    modules: HashMap<String, HashMap<String, Type>>,
+    module_loader: ModuleLoader,
 }
 
 impl TypeChecker {
@@ -111,70 +18,13 @@ impl TypeChecker {
         Self {
             environment: Environment::new(),
             errors: Vec::new(),
-            current_directory: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
-            modules: HashMap::new(),
+            module_loader: ModuleLoader::new(),
         }
     }
 
     /// Set the current directory for import resolution
     pub fn set_current_directory<P: AsRef<Path>>(&mut self, path: P) {
-        self.current_directory = path.as_ref().to_path_buf();
-    }
-
-    /// Load and type-check a module from file
-    fn load_and_check_module(
-        &mut self,
-        path: &str,
-        module_name: &str,
-        span: &Span,
-    ) -> TypeResult<HashMap<String, Type>> {
-        // Resolve the import path relative to current directory
-        let import_path = self.current_directory.join(path);
-
-        // Read the file content
-        let content = fs::read_to_string(&import_path).map_err(|_| TypeError::ImportError {
-            message: format!("Failed to read module file: {}", import_path.display()),
-            path: path.to_string(),
-            span: span.clone(),
-        })?;
-
-        // Parse the file content
-        let mut lexer = crate::lexer::tokenizer::Tokenizer::new("");
-        let tokens = lexer
-            .tokenize(&content)
-            .map_err(|e| TypeError::ImportError {
-                message: format!("Failed to tokenize module {}: {}", module_name, e),
-                path: path.to_string(),
-                span: span.clone(),
-            })?;
-
-        let mut parser = crate::ast::parser::Parser::new(tokens);
-        let program = parser.parse().map_err(|e| TypeError::ImportError {
-            message: format!("Failed to parse module {}: {}", module_name, e),
-            path: path.to_string(),
-            span: span.clone(),
-        })?;
-
-        // Create a new type checker for the module
-        let mut module_checker = TypeChecker::new();
-
-        // Set the module's current directory to the imported file's directory
-        if let Some(parent) = import_path.parent() {
-            module_checker.set_current_directory(parent);
-        }
-
-        // Type-check the module
-        let _typed_program =
-            module_checker
-                .check_program(&program)
-                .map_err(|e| TypeError::ImportError {
-                    message: format!("Failed to type-check module {}: {}", module_name, e),
-                    path: path.to_string(),
-                    span: span.clone(),
-                })?;
-
-        // Extract all top-level bindings as exports
-        Ok(module_checker.environment.get_all_bindings_types())
+        self.module_loader.set_current_directory(path);
     }
 
     /// Type check a program and return the typed AST
@@ -186,7 +36,6 @@ impl TypeChecker {
                 Ok(typed_stmt) => typed_statements.push(typed_stmt),
                 Err(err) => {
                     self.errors.push(err.clone());
-                    // Continue checking other statements even after errors
                     return Err(err);
                 }
             }
@@ -216,15 +65,16 @@ impl TypeChecker {
                 let typed_value = self.check_expression(value)?;
                 let inferred_type = typed_value.ty.clone();
 
-                // If there's a type annotation, check it matches the inferred type
                 let final_type = if let Some(annotation) = type_annotation {
                     let annotated_type = self.convert_type_expression(annotation)?;
 
                     // Special handling for function types with Unknown parameters/results
-                    let refined_type =
-                        self.refine_type_with_annotation(&inferred_type, &annotated_type)?;
+                    let refined_type = TypeCompatibility::refine_type_with_annotation(
+                        &inferred_type,
+                        &annotated_type,
+                    )?;
 
-                    if !self.types_compatible(&annotated_type, &refined_type) {
+                    if !TypeCompatibility::types_compatible(&annotated_type, &refined_type) {
                         return Err(TypeError::TypeMismatch {
                             expected: annotated_type,
                             found: refined_type,
@@ -276,7 +126,6 @@ impl TypeChecker {
                     .transpose()?;
 
                 // Create preliminary function type for recursive calls
-                // Use Unknown for return type if not annotated (will be refined later)
                 let preliminary_return_type = expected_return_type.clone().unwrap_or(Type::Unknown);
                 let preliminary_function_type =
                     Type::function(param_type.clone(), preliminary_return_type);
@@ -297,7 +146,7 @@ impl TypeChecker {
 
                 // Check return type matches annotation if provided
                 let final_return_type = if let Some(expected) = expected_return_type {
-                    if !self.types_compatible(&expected, &actual_return_type) {
+                    if !TypeCompatibility::types_compatible(&expected, &actual_return_type) {
                         self.environment.exit_scope();
                         return Err(TypeError::TypeMismatch {
                             expected,
@@ -331,10 +180,13 @@ impl TypeChecker {
                 let import_name = alias.as_ref().unwrap_or(path);
 
                 // Load and type-check the module
-                let module_exports = self.load_and_check_module(path, import_name, span)?;
+                let module_exports =
+                    self.module_loader
+                        .load_and_check_module(path, import_name, span)?;
 
                 // Store the module's exports for later lookup
-                self.modules.insert(import_name.clone(), module_exports);
+                self.module_loader
+                    .store_module_exports(import_name.clone(), module_exports);
 
                 Ok(TypedStatement::Import {
                     path: path.clone(),
@@ -373,7 +225,7 @@ impl TypeChecker {
             },
             Expression::QualifiedIdentifier { module, name, span } => {
                 // Look up the module's exports
-                if let Some(module_exports) = self.modules.get(module) {
+                if let Some(module_exports) = self.module_loader.get_module_exports(module) {
                     if let Some(export_type) = module_exports.get(name) {
                         Ok(TypedExpression::new(export_type.clone(), span.clone()))
                     } else {
@@ -453,16 +305,18 @@ impl TypeChecker {
                 let param_type = if let Some(param_type_expr) = param_type {
                     self.convert_type_expression(param_type_expr)?
                 } else {
-                    self.infer_parameter_type(param, body)?
+                    let inference = TypeInference::new(self.environment.clone());
+                    inference.infer_parameter_type(param, body)?
                 };
 
-                // Create a new type checker with a child environment for the function scope
                 let mut function_checker = TypeChecker {
                     environment: Environment::with_parent(self.environment.clone()),
                     errors: Vec::new(),
-                    current_directory: self.current_directory.clone(),
-                    modules: self.modules.clone(),
+                    module_loader: ModuleLoader::new(),
                 };
+                function_checker
+                    .module_loader
+                    .set_current_directory(self.module_loader.get_current_directory());
 
                 // Bind the parameter in the function's scope
                 function_checker
@@ -492,15 +346,15 @@ impl TypeChecker {
                     Type::Function { param, result } => {
                         // Enhanced type checking with Unknown type handling
                         let refined_param =
-                            self.refine_type_with_context(param, &argument_typed.ty);
-                        let refined_result = self.refine_type_with_context(result, &Type::Unknown);
+                            TypeCompatibility::refine_type_with_context(param, &argument_typed.ty);
+                        let refined_result =
+                            TypeCompatibility::refine_type_with_context(result, &Type::Unknown);
 
-                        // Check if argument type is compatible with parameter type
-                        // Be more permissive with Unknown types in recursive contexts
-                        let is_compatible = self
-                            .types_compatible(&argument_typed.ty, &refined_param)
-                            || (argument_typed.ty == Type::Unknown
-                                && matches!(refined_param, Type::List { .. }))
+                        let is_compatible = TypeCompatibility::types_compatible(
+                            &argument_typed.ty,
+                            &refined_param,
+                        ) || (argument_typed.ty == Type::Unknown
+                            && matches!(refined_param, Type::List { .. }))
                             || matches!(&argument_typed.ty, Type::List { element } if **element == Type::Unknown)
                             || matches!(&argument_typed.ty, Type::Sum { left, right } if **left == Type::Unknown || **right == Type::Unknown)
                             || matches!(&refined_param, Type::Sum { left, right } if **left == Type::Unknown || **right == Type::Unknown);
@@ -515,11 +369,7 @@ impl TypeChecker {
                             })
                         }
                     }
-                    Type::Unknown => {
-                        // If function type is unknown, try to infer it from context
-                        // Assume it's a function and return Unknown result
-                        Ok(TypedExpression::new(Type::Unknown, span.clone()))
-                    }
+                    Type::Unknown => Ok(TypedExpression::new(Type::Unknown, span.clone())),
                     _ => Err(TypeError::TypeMismatch {
                         expected: Type::Function {
                             param: Box::new(Type::Unknown),
@@ -621,14 +471,13 @@ impl TypeChecker {
                         let mut left_checker = TypeChecker {
                             environment: Environment::with_parent(self.environment.clone()),
                             errors: Vec::new(),
-                            current_directory: self.current_directory.clone(),
-                            modules: self.modules.clone(),
+                            module_loader: ModuleLoader::new(),
                         };
+                        left_checker
+                            .module_loader
+                            .set_current_directory(self.module_loader.get_current_directory());
                         // Handle Unknown type in sum (from inference)
                         let left_type = if **left == Type::Unknown {
-                            // If we don't know the type, we can't check the body properly unless we infer it.
-                            // For now, let's assume Unknown propagates or we treat it as Unknown.
-                            // But better to bind it as Unknown.
                             Type::Unknown
                         } else {
                             *left.clone()
@@ -643,9 +492,11 @@ impl TypeChecker {
                         let mut right_checker = TypeChecker {
                             environment: Environment::with_parent(self.environment.clone()),
                             errors: Vec::new(),
-                            current_directory: self.current_directory.clone(),
-                            modules: self.modules.clone(),
+                            module_loader: ModuleLoader::new(),
                         };
+                        right_checker
+                            .module_loader
+                            .set_current_directory(self.module_loader.get_current_directory());
                         let right_type = if **right == Type::Unknown {
                             Type::Unknown
                         } else {
@@ -658,7 +509,10 @@ impl TypeChecker {
                         let typed_right_body = right_checker.check_expression(right_body)?;
 
                         // Ensure branches return compatible types
-                        if self.types_compatible(&typed_left_body.ty, &typed_right_body.ty) {
+                        if TypeCompatibility::types_compatible(
+                            &typed_left_body.ty,
+                            &typed_right_body.ty,
+                        ) {
                             // If one is Unknown, prefer the other
                             let result_type = if typed_left_body.ty == Type::Unknown {
                                 typed_right_body.ty
@@ -706,9 +560,12 @@ impl TypeChecker {
                                 },
                             ) => {
                                 // More flexible type checking for recursive functions
-                                if self.types_compatible(inner_param, inner_result)
-                                    && self.types_compatible(outer_param, outer_result)
-                                    && self.types_compatible(inner_param, outer_param)
+                                if TypeCompatibility::types_compatible(inner_param, inner_result)
+                                    && TypeCompatibility::types_compatible(
+                                        outer_param,
+                                        outer_result,
+                                    )
+                                    && TypeCompatibility::types_compatible(inner_param, outer_param)
                                 {
                                     // Return the fixed point type T -> T
                                     Ok(TypedExpression::new(
@@ -757,9 +614,11 @@ impl TypeChecker {
                 let mut block_checker = TypeChecker {
                     environment: Environment::with_parent(self.environment.clone()),
                     errors: Vec::new(),
-                    current_directory: self.current_directory.clone(),
-                    modules: self.modules.clone(),
+                    module_loader: ModuleLoader::new(),
                 };
+                block_checker
+                    .module_loader
+                    .set_current_directory(self.module_loader.get_current_directory());
 
                 // Check all statements in the block
                 for stmt in statements {
@@ -812,7 +671,7 @@ impl TypeChecker {
                 match &tail_typed.ty {
                     Type::List { element } => {
                         // Check if head type matches the list element type
-                        if self.types_compatible(&head_typed.ty, element) {
+                        if TypeCompatibility::types_compatible(&head_typed.ty, element) {
                             Ok(TypedExpression::new(tail_typed.ty.clone(), span.clone()))
                         } else {
                             Err(TypeError::TypeMismatch {
@@ -894,9 +753,11 @@ impl TypeChecker {
                 let mut for_checker = TypeChecker {
                     environment: Environment::with_parent(self.environment.clone()),
                     errors: Vec::new(),
-                    current_directory: self.current_directory.clone(),
-                    modules: self.modules.clone(),
+                    module_loader: ModuleLoader::new(),
                 };
+                for_checker
+                    .module_loader
+                    .set_current_directory(self.module_loader.get_current_directory());
                 for_checker.environment.bind(variable.clone(), element_type);
                 let _ = for_checker.check_expression(body)?;
 
@@ -1121,176 +982,6 @@ impl TypeChecker {
         }
     }
 
-    /// Refine a type based on type annotation information
-    fn refine_type_with_annotation(&self, inferred: &Type, annotated: &Type) -> TypeResult<Type> {
-        match (inferred, annotated) {
-            // If the inferred type has Unknown components, use the annotated type
-            (
-                Type::Function {
-                    param: inf_param,
-                    result: inf_result,
-                },
-                Type::Function {
-                    param: ann_param,
-                    result: ann_result,
-                },
-            ) => {
-                // If inferred parameter is Unknown, use annotated parameter type
-                let refined_param = if matches!(**inf_param, Type::Unknown) {
-                    ann_param.clone()
-                } else {
-                    inf_param.clone()
-                };
-
-                // If inferred result is Unknown, use annotated result type
-                let refined_result = if matches!(**inf_result, Type::Unknown) {
-                    ann_result.clone()
-                } else {
-                    inf_result.clone()
-                };
-
-                Ok(Type::Function {
-                    param: refined_param,
-                    result: refined_result,
-                })
-            }
-            // Handle list types with Unknown elements
-            (Type::List { element: inf_elem }, Type::List { element: ann_elem }) => {
-                // If inferred element is Unknown, use annotated element type
-                let refined_element = if matches!(**inf_elem, Type::Unknown) {
-                    ann_elem.clone()
-                } else {
-                    inf_elem.clone()
-                };
-
-                Ok(Type::List {
-                    element: refined_element,
-                })
-            }
-            // Handle sum types with Unknown components
-            (
-                Type::Sum {
-                    left: inf_left,
-                    right: inf_right,
-                },
-                Type::Sum {
-                    left: ann_left,
-                    right: ann_right,
-                },
-            ) => {
-                let refined_left = if matches!(**inf_left, Type::Unknown) {
-                    ann_left.clone()
-                } else {
-                    inf_left.clone()
-                };
-
-                let refined_right = if matches!(**inf_right, Type::Unknown) {
-                    ann_right.clone()
-                } else {
-                    inf_right.clone()
-                };
-
-                Ok(Type::Sum {
-                    left: refined_left,
-                    right: refined_right,
-                })
-            }
-            // For non-function/non-list types, return the inferred type as-is
-            _ => Ok(inferred.clone()),
-        }
-    }
-
-    /// Refine a type by replacing Unknown with more specific types based on context
-    fn refine_type_with_context(&self, original: &Type, context: &Type) -> Type {
-        match (original, context) {
-            (Type::Unknown, concrete_type) if !matches!(concrete_type, Type::Unknown) => {
-                concrete_type.clone()
-            }
-            // Handle List types with Unknown elements
-            (
-                Type::List { element },
-                Type::List {
-                    element: context_element,
-                },
-            ) => Type::List {
-                element: Box::new(self.refine_type_with_context(element, context_element)),
-            },
-            // If original is Unknown but context suggests List, use List with Unknown elements
-            (Type::Unknown, Type::List { .. }) => context.clone(),
-            // If context has Unknown but original is more specific, prefer original
-            (original_type, Type::Unknown) => original_type.clone(),
-            // Handle Sum types with Unknown components
-            (
-                Type::Sum { left, right },
-                Type::Sum {
-                    left: context_left,
-                    right: context_right,
-                },
-            ) => Type::Sum {
-                left: Box::new(self.refine_type_with_context(left, context_left)),
-                right: Box::new(self.refine_type_with_context(right, context_right)),
-            },
-            // If original is Unknown but context suggests Sum, use Sum
-            (Type::Unknown, Type::Sum { .. }) => context.clone(),
-            (Type::Function { param, result }, _) => Type::Function {
-                param: Box::new(self.refine_type_with_context(param, &Type::Unknown)),
-                result: Box::new(self.refine_type_with_context(result, &Type::Unknown)),
-            },
-            _ => original.clone(),
-        }
-    }
-
-    fn types_compatible(&self, t1: &Type, t2: &Type) -> bool {
-        match (t1, t2) {
-            // Unknown types are compatible with anything
-            (Type::Unknown, _) | (_, Type::Unknown) => true,
-
-            // Function types are compatible if their parameters and results are compatible
-            (
-                Type::Function {
-                    param: p1,
-                    result: r1,
-                },
-                Type::Function {
-                    param: p2,
-                    result: r2,
-                },
-            ) => self.types_compatible(p1, p2) && self.types_compatible(r1, r2),
-
-            // List types are compatible if their element types are compatible
-            (Type::List { element: e1 }, Type::List { element: e2 }) => {
-                self.types_compatible(e1, e2)
-            }
-
-            // Pair types are compatible if their first and second types are compatible
-            (
-                Type::Pair {
-                    first: f1,
-                    second: s1,
-                },
-                Type::Pair {
-                    first: f2,
-                    second: s2,
-                },
-            ) => self.types_compatible(f1, f2) && self.types_compatible(s1, s2),
-
-            // Sum types are compatible if their left and right types are compatible
-            (
-                Type::Sum {
-                    left: l1,
-                    right: r1,
-                },
-                Type::Sum {
-                    left: l2,
-                    right: r2,
-                },
-            ) => self.types_compatible(l1, l2) && self.types_compatible(r1, r2),
-
-            // Otherwise, use structural equality
-            _ => t1 == t2,
-        }
-    }
-
     /// Get all accumulated type errors
     pub fn get_errors(&self) -> &[TypeError] {
         &self.errors
@@ -1298,420 +989,12 @@ impl TypeChecker {
 
     /// Clear all accumulated errors
     pub fn clear_errors(&mut self) {
-        self.errors.clear();
+        self.errors.clear()
     }
 
     /// Get the current type environment
     pub fn get_environment(&self) -> &Environment {
         &self.environment
-    }
-
-    /// Infer the parameter type based on how it's used in the function body
-    fn infer_parameter_type(&mut self, param: &str, body: &Expression) -> TypeResult<Type> {
-        // Enhanced type inference for function parameters
-
-        // First, try to analyze direct usage patterns
-        if let Some(inferred_type) = self.analyze_parameter_usage(param, body) {
-            return Ok(inferred_type);
-        }
-
-        // Check if parameter is used in function call contexts
-        if let Some(func_type) = self.analyze_function_usage(param, body) {
-            return Ok(func_type);
-        }
-
-        // Check if parameter appears to be a function based on call patterns
-        if self.parameter_used_as_function(param, body) {
-            // Create a generic function type - this will be refined later
-            return Ok(Type::Function {
-                param: Box::new(Type::Unknown),
-                result: Box::new(Type::Unknown),
-            });
-        }
-
-        // If we can't infer the type from usage, start with Unknown
-        // but try to refine it through constraint solving
-        Ok(Type::Unknown)
-    }
-
-    /// Check if a parameter is used in function call contexts
-    fn analyze_function_usage(&self, param: &str, expr: &Expression) -> Option<Type> {
-        match expr {
-            Expression::FunctionCall {
-                function, argument, ..
-            } => {
-                if let Expression::Identifier { name, .. } = function.as_ref() {
-                    if name == param {
-                        // Parameter is called as a function
-                        // Try to infer the argument type
-                        let arg_type = self.get_expression_type_hint(argument);
-                        return Some(Type::Function {
-                            param: Box::new(arg_type),
-                            result: Box::new(Type::Unknown),
-                        });
-                    }
-                }
-                // Recursively check sub-expressions
-                if let Some(func_type) = self.analyze_function_usage(param, function) {
-                    return Some(func_type);
-                }
-                if let Some(func_type) = self.analyze_function_usage(param, argument) {
-                    return Some(func_type);
-                }
-            }
-            Expression::Function { body, .. } => {
-                return self.analyze_function_usage(param, body);
-            }
-            Expression::Block {
-                statements,
-                expression,
-                ..
-            } => {
-                for stmt in statements {
-                    if let Statement::Expression {
-                        expression: expr, ..
-                    } = stmt
-                    {
-                        if let Some(func_type) = self.analyze_function_usage(param, expr) {
-                            return Some(func_type);
-                        }
-                    }
-                }
-                if let Some(expr) = expression {
-                    return self.analyze_function_usage(param, expr);
-                }
-            }
-            _ => {}
-        }
-        None
-    }
-
-    /// Check if a parameter is used as a function (called with arguments)
-    fn parameter_used_as_function(&self, param: &str, expr: &Expression) -> bool {
-        match expr {
-            Expression::FunctionCall { function, .. } => {
-                if let Expression::Identifier { name, .. } = function.as_ref() {
-                    if name == param {
-                        return true;
-                    }
-                }
-                false
-            }
-            Expression::Function { body, .. } => self.parameter_used_as_function(param, body),
-            Expression::Block {
-                statements,
-                expression,
-                ..
-            } => {
-                for stmt in statements {
-                    if let Statement::Expression {
-                        expression: expr, ..
-                    } = stmt
-                    {
-                        if self.parameter_used_as_function(param, expr) {
-                            return true;
-                        }
-                    }
-                }
-                if let Some(expr) = expression {
-                    return self.parameter_used_as_function(param, expr);
-                }
-                false
-            }
-            _ => false,
-        }
-    }
-
-    /// Get a type hint for an expression without full type checking
-    fn get_expression_type_hint(&self, expr: &Expression) -> Type {
-        match expr {
-            Expression::Number { .. } => Type::Int,
-            Expression::Boolean { .. } => Type::Bool,
-            Expression::Identifier { name, .. } => {
-                // Try to look up in current environment
-                if let Some(ty) = self.environment.lookup(name) {
-                    ty.clone()
-                } else {
-                    Type::Unknown
-                }
-            }
-            Expression::Function { .. } => Type::Function {
-                param: Box::new(Type::Unknown),
-                result: Box::new(Type::Unknown),
-            },
-            _ => Type::Unknown,
-        }
-    }
-
-    /// Analyze how a parameter is used in an expression to infer its type
-    fn analyze_parameter_usage(&self, param: &str, expr: &Expression) -> Option<Type> {
-        match expr {
-            Expression::Identifier { name, .. } if name == param => {
-                // Parameter is used directly - we need more context to infer type
-                None
-            }
-            Expression::BinaryOp {
-                left,
-                operator,
-                right,
-                ..
-            } => {
-                // First check if parameter is used in pair operations in sub-expressions
-                let left_pair_usage = self.analyze_parameter_usage(param, left);
-                let right_pair_usage = self.analyze_parameter_usage(param, right);
-
-                // If we find pair usage, prioritize it
-                if let Some(ref pair_type) = left_pair_usage {
-                    if matches!(pair_type, Type::Pair { .. }) {
-                        return left_pair_usage;
-                    }
-                }
-                if let Some(ref pair_type) = right_pair_usage {
-                    if matches!(pair_type, Type::Pair { .. }) {
-                        return right_pair_usage;
-                    }
-                }
-
-                // Check if parameter is used in arithmetic operations
-                let left_uses_param = self.expression_uses_parameter(param, left);
-                let right_uses_param = self.expression_uses_parameter(param, right);
-
-                // Also check for list operations in arithmetic context
-                let left_list_usage = self.analyze_parameter_usage(param, left);
-                let right_list_usage = self.analyze_parameter_usage(param, right);
-
-                // If we find list usage in arithmetic context, return List<Int>
-                if matches!(
-                    operator,
-                    crate::ast::BinaryOperator::Add
-                        | crate::ast::BinaryOperator::Subtract
-                        | crate::ast::BinaryOperator::Multiply
-                        | crate::ast::BinaryOperator::Divide
-                ) {
-                    if let Some(Type::List { .. }) = left_list_usage {
-                        return Some(Type::List {
-                            element: Box::new(Type::Int),
-                        });
-                    }
-                    if let Some(Type::List { .. }) = right_list_usage {
-                        return Some(Type::List {
-                            element: Box::new(Type::Int),
-                        });
-                    }
-                }
-
-                if left_uses_param || right_uses_param {
-                    match operator {
-                        crate::ast::BinaryOperator::Add
-                        | crate::ast::BinaryOperator::Subtract
-                        | crate::ast::BinaryOperator::Multiply
-                        | crate::ast::BinaryOperator::Divide => Some(Type::Int),
-                        crate::ast::BinaryOperator::LogicalAnd
-                        | crate::ast::BinaryOperator::LogicalOr => Some(Type::Bool),
-                        _ => None,
-                    }
-                } else {
-                    // Return any other inferred type
-                    left_pair_usage.or(right_pair_usage)
-                }
-            }
-            Expression::FunctionCall {
-                function, argument, ..
-            } => {
-                // If parameter is used as a function, infer it's a function type
-                if let Expression::Identifier { name, .. } = function.as_ref() {
-                    if name == param {
-                        // Parameter is being called as a function
-                        // We'd need more sophisticated analysis to determine exact function type
-                        return Some(Type::Function {
-                            param: Box::new(Type::Unknown),
-                            result: Box::new(Type::Unknown),
-                        });
-                    }
-                }
-
-                // Special case: if argument is tail(param), infer function takes lists
-                if let Expression::TailProjection { list, .. } = argument.as_ref() {
-                    if self.expression_uses_parameter(param, list) {
-                        // The function being called should accept a list type
-                        // and return some type (Unknown for now)
-                        return Some(Type::List {
-                            element: Box::new(Type::Unknown),
-                        });
-                    }
-                }
-
-                // Recursively check sub-expressions
-                self.analyze_parameter_usage(param, function)
-                    .or_else(|| self.analyze_parameter_usage(param, argument))
-            }
-            Expression::FirstProjection { pair, .. } => {
-                // If parameter is used in fst(), infer it's a pair type
-                if self.expression_uses_parameter(param, pair) {
-                    Some(Type::Pair {
-                        first: Box::new(Type::Unknown),
-                        second: Box::new(Type::Unknown),
-                    })
-                } else {
-                    self.analyze_parameter_usage(param, pair)
-                }
-            }
-            Expression::SecondProjection { pair, .. } => {
-                // If parameter is used in snd(), infer it's a pair type
-                if self.expression_uses_parameter(param, pair) {
-                    Some(Type::Pair {
-                        first: Box::new(Type::Unknown),
-                        second: Box::new(Type::Unknown),
-                    })
-                } else {
-                    self.analyze_parameter_usage(param, pair)
-                }
-            }
-            Expression::HeadProjection { list, .. } => {
-                // If parameter is used in head(), infer it's a list type
-                if self.expression_uses_parameter(param, list) {
-                    // Use Unknown for element type to allow flexible inference
-                    Some(Type::List {
-                        element: Box::new(Type::Unknown),
-                    })
-                } else {
-                    self.analyze_parameter_usage(param, list)
-                }
-            }
-            Expression::TailProjection { list, .. } => {
-                // If parameter is used in tail(), infer it's a list type
-                if self.expression_uses_parameter(param, list) {
-                    // Use Unknown for element type to allow flexible inference
-                    Some(Type::List {
-                        element: Box::new(Type::Unknown),
-                    })
-                } else {
-                    self.analyze_parameter_usage(param, list)
-                }
-            }
-            Expression::Case {
-                expression,
-                left_body,
-                right_body,
-                ..
-            } => {
-                // If parameter is used in case expression, it should be a sum type
-                if self.expression_uses_parameter(param, expression) {
-                    // Parameter is being case-matched, so it must be a sum type
-                    // We need to infer the types from the branches
-                    return Some(Type::Sum {
-                        left: Box::new(Type::Unknown),
-                        right: Box::new(Type::Unknown),
-                    });
-                }
-
-                // Check if parameter is used in the branches
-                let left_usage = self.analyze_parameter_usage(param, left_body);
-                let right_usage = self.analyze_parameter_usage(param, right_body);
-
-                left_usage.or(right_usage)
-            }
-            Expression::Block {
-                statements,
-                expression,
-                ..
-            } => {
-                // Check statements first
-                for stmt in statements {
-                    if let Some(ty) = self.analyze_parameter_usage_in_statement(param, stmt) {
-                        return Some(ty);
-                    }
-                }
-
-                // Check final expression
-                if let Some(expr) = expression {
-                    self.analyze_parameter_usage(param, expr)
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }
-    }
-
-    /// Check if an expression uses the given parameter
-    fn expression_uses_parameter(&self, param: &str, expr: &Expression) -> bool {
-        match expr {
-            Expression::Identifier { name, .. } => name == param,
-            Expression::BinaryOp { left, right, .. } => {
-                self.expression_uses_parameter(param, left)
-                    || self.expression_uses_parameter(param, right)
-            }
-            Expression::FunctionCall {
-                function, argument, ..
-            } => {
-                self.expression_uses_parameter(param, function)
-                    || self.expression_uses_parameter(param, argument)
-            }
-            Expression::FirstProjection { pair, .. } => self.expression_uses_parameter(param, pair),
-            Expression::SecondProjection { pair, .. } => {
-                self.expression_uses_parameter(param, pair)
-            }
-            Expression::HeadProjection { list, .. } => self.expression_uses_parameter(param, list),
-            Expression::TailProjection { list, .. } => self.expression_uses_parameter(param, list),
-            Expression::Case {
-                expression,
-                left_body,
-                right_body,
-                ..
-            } => {
-                self.expression_uses_parameter(param, expression)
-                    || self.expression_uses_parameter(param, left_body)
-                    || self.expression_uses_parameter(param, right_body)
-            }
-            Expression::Block {
-                statements,
-                expression,
-                ..
-            } => {
-                statements
-                    .iter()
-                    .any(|stmt| self.statement_uses_parameter(param, stmt))
-                    || expression
-                        .as_ref()
-                        .map_or(false, |expr| self.expression_uses_parameter(param, expr))
-            }
-            _ => false,
-        }
-    }
-
-    /// Check if a statement uses the given parameter
-    fn statement_uses_parameter(&self, param: &str, stmt: &Statement) -> bool {
-        match stmt {
-            Statement::VariableDeclaration { value, .. } => {
-                self.expression_uses_parameter(param, value)
-            }
-            Statement::FunctionDeclaration { body, .. } => {
-                self.expression_uses_parameter(param, body)
-            }
-
-            Statement::Import { .. } => false,
-            Statement::Expression { expression, .. } => {
-                self.expression_uses_parameter(param, expression)
-            }
-        }
-    }
-
-    /// Analyze parameter usage in statements
-    fn analyze_parameter_usage_in_statement(&self, param: &str, stmt: &Statement) -> Option<Type> {
-        match stmt {
-            Statement::VariableDeclaration { value, .. } => {
-                self.analyze_parameter_usage(param, value)
-            }
-            Statement::FunctionDeclaration { body, .. } => {
-                self.analyze_parameter_usage(param, body)
-            }
-
-            Statement::Import { .. } => None,
-            Statement::Expression { expression, .. } => {
-                self.analyze_parameter_usage(param, expression)
-            }
-        }
     }
 }
 
