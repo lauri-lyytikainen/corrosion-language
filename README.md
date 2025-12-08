@@ -2,7 +2,11 @@
 
 Corrosion is a statically typed interpreted functional programming language built with Rust, featuring static typing, immutable data structures, and an interactive development environment. It combines the safety of static typing with the expressiveness of functional programming paradigms.
 
+## Note
+
 > The TUTORIAL.md file contains a comprehensive guide to getting started with Corrosion
+
+> The `exercises` directory includes a few programming exercises to practice and demonstrate Corrosion language
 
 ## Overview
 

@@ -9,10 +9,8 @@ fn test_pair_integration() {
     let mut parser = Parser::new(tokens);
     let program = parser.parse().unwrap();
 
-    // Should parse successfully
     assert_eq!(program.statements.len(), 1);
 
-    // Check that it's a pair expression statement
     match &program.statements[0] {
         crate::ast::Statement::Expression { expression, .. } => match expression {
             crate::ast::Expression::Pair { first, second, .. } => {
@@ -45,7 +43,6 @@ fn test_nested_pair_integration() {
         crate::ast::Statement::Expression { expression, .. } => {
             match expression {
                 crate::ast::Expression::Pair { first, second, .. } => {
-                    // First should be a pair (1, true)
                     match first.as_ref() {
                         crate::ast::Expression::Pair {
                             first: inner_first,

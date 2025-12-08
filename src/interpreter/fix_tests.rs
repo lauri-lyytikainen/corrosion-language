@@ -19,7 +19,6 @@ mod fix_tests {
 
         if let Statement::Expression { expression, .. } = &program.statements[0] {
             if let Expression::Fix { .. } = expression {
-                // Successfully parsed a fix expression
             } else {
                 panic!("Expected Fix expression, got {:?}", expression);
             }
@@ -44,7 +43,6 @@ mod fix_tests {
         let mut interpreter = Interpreter::new();
         let result = interpreter.interpret_program(&program);
 
-        // Should not panic - the fixed point operator should work
         assert!(result.is_ok());
     }
 }

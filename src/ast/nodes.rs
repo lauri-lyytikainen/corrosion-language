@@ -1,6 +1,5 @@
 use crate::lexer::tokens::{Span, Token};
 
-/// AST node types for the Corrosion language
 #[derive(Debug, Clone, PartialEq)]
 pub enum AstNode {
     Program(Program),
@@ -9,7 +8,6 @@ pub enum AstNode {
     TypeExpression(TypeExpression),
 }
 
-/// Type expressions for type annotations
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeExpression {
     Int {
@@ -47,7 +45,7 @@ pub enum TypeExpression {
     Named {
         name: String,
         span: Span,
-    }, // For named types/type variables
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -123,7 +121,6 @@ pub enum Expression {
         operand: Box<Expression>,
         span: Span,
     },
-    // Function expressions
     Function {
         param: String, // Parameter name
         param_type: Option<TypeExpression>,
@@ -135,12 +132,10 @@ pub enum Expression {
         argument: Box<Expression>,
         span: Span,
     },
-    // List expressions
     List {
         elements: Vec<Expression>,
         span: Span,
     },
-    // Pair expressions
     Pair {
         first: Box<Expression>,
         second: Box<Expression>,
@@ -301,7 +296,6 @@ impl From<Token> for BinaryOperator {
     }
 }
 
-// Helper trait for getting span information from AST nodes
 pub trait Spanned {
     fn span(&self) -> &Span;
 }

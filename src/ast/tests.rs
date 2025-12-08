@@ -105,7 +105,6 @@ mod tests {
 
         assert_eq!(program.statements.len(), 2);
 
-        // First statement: let x = 42;
         match &program.statements[0] {
             Statement::VariableDeclaration { name, .. } => {
                 assert_eq!(name, "x");

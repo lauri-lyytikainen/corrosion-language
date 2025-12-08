@@ -200,7 +200,7 @@ fn test_anonymous_function_backward_compatibility() {
                 param, param_type, ..
             } => {
                 assert_eq!(param, "x");
-                assert!(param_type.is_none()); // Should be None for backward compatibility
+                assert!(param_type.is_none());
             }
             _ => panic!("Expected function expression"),
         },

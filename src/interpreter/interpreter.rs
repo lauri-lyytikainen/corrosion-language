@@ -4,16 +4,12 @@ use crate::lexer::tokens::Span;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Interpreter for the Corrosion language
 pub struct Interpreter {
-    /// Current environment for variable bindings
     environment: Environment,
-    /// Current directory for resolving imports
     current_directory: PathBuf,
 }
 
 impl Interpreter {
-    /// Create a new interpreter
     pub fn new() -> Self {
         Self {
             environment: Environment::new(),
@@ -21,7 +17,6 @@ impl Interpreter {
         }
     }
 
-    /// Create a new interpreter with a given environment
     pub fn with_environment(environment: Environment) -> Self {
         Self {
             environment,
@@ -29,12 +24,10 @@ impl Interpreter {
         }
     }
 
-    /// Set the current directory for import resolution
     pub fn set_current_directory<P: AsRef<Path>>(&mut self, path: P) {
         self.current_directory = path.as_ref().to_path_buf();
     }
 
-    /// Interpret a program and return the result
     pub fn interpret_program(&mut self, program: &Program) -> InterpreterResult<Value> {
         for statement in &program.statements {
             self.interpret_statement(statement)?;
@@ -43,7 +36,6 @@ impl Interpreter {
         Ok(Value::Unit)
     }
 
-    /// Interpret a program for REPL use, returning the result of the last expression
     pub fn interpret_program_repl(&mut self, program: &Program) -> InterpreterResult<Value> {
         let mut last_result = Value::Unit;
 
@@ -54,7 +46,6 @@ impl Interpreter {
         Ok(last_result)
     }
 
-    /// Interpret a single statement
     pub fn interpret_statement(&mut self, statement: &Statement) -> InterpreterResult<Value> {
         match statement {
             Statement::VariableDeclaration { name, value, .. } => {
@@ -65,10 +56,6 @@ impl Interpreter {
             Statement::FunctionDeclaration {
                 name, param, body, ..
             } => {
-                // For recursive functions, wrap them in a FixedPoint automatically
-                // This allows the function to reference itself without explicit fix()
-
-                // Create the inner function that takes the recursive reference
                 let recursive_function = Value::Function {
                     param: name.clone(), // The recursive reference parameter
                     body: Box::new(Expression::Function {
@@ -80,7 +67,6 @@ impl Interpreter {
                     env: self.environment.clone(),
                 };
 
-                // Wrap it in a FixedPoint
                 let function_val = Value::FixedPoint {
                     function: Box::new(recursive_function),
                 };
@@ -91,10 +77,8 @@ impl Interpreter {
             Statement::Import { path, alias, span } => {
                 let import_name = alias.as_ref().unwrap_or(path);
 
-                // Resolve the import path relative to current directory
                 let import_path = self.current_directory.join(path);
 
-                // Load and execute the imported file
                 let module_val = self.load_module(&import_path, import_name, span)?;
 
                 self.environment.bind(import_name.clone(), module_val);
@@ -104,20 +88,17 @@ impl Interpreter {
         }
     }
 
-    /// Load and execute a module from file
     fn load_module(
         &mut self,
         path: &Path,
         module_name: &str,
         span: &Span,
     ) -> InterpreterResult<Value> {
-        // Read the file content
         let content = fs::read_to_string(path).map_err(|_| InterpreterError::RuntimeError {
             message: format!("Failed to read module file: {}", path.display()),
             span: Some(span.clone()),
         })?;
 
-        // Parse the file content
         let mut lexer = crate::lexer::tokenizer::Tokenizer::new("");
         let tokens = lexer
             .tokenize(&content)
@@ -132,15 +113,12 @@ impl Interpreter {
             span: Some(span.clone()),
         })?;
 
-        // Create a new environment for the module to execute in isolation
         let mut module_interpreter = Interpreter::new();
 
-        // Set the module's current directory to the imported file's directory
         if let Some(parent) = path.parent() {
             module_interpreter.set_current_directory(parent);
         }
 
-        // Execute the module
         module_interpreter
             .interpret_program(&program)
             .map_err(|e| InterpreterError::RuntimeError {
@@ -148,7 +126,6 @@ impl Interpreter {
                 span: Some(span.clone()),
             })?;
 
-        // Extract all top-level bindings as exports
         let exports = module_interpreter.environment.get_all_bindings();
 
         Ok(Value::Module {
@@ -157,7 +134,6 @@ impl Interpreter {
         })
     }
 
-    /// Interpret an expression and return its value
     pub fn interpret_expression(&mut self, expr: &Expression) -> InterpreterResult<Value> {
         match expr {
             Expression::Number { value, .. } => Ok(Value::Int(*value)),
@@ -176,7 +152,6 @@ impl Interpreter {
             }
 
             Expression::QualifiedIdentifier { module, name, span } => {
-                // Look up the module first
                 if let Some(module_val) = self.environment.lookup(module) {
                     if let Value::Module { exports, .. } = module_val {
                         // Look up the name in the module's exports
@@ -275,16 +250,12 @@ impl Interpreter {
 
             Expression::Fix { function, span } => {
                 // Implement the Y-combinator style fixed point operator
-                // fix(f) = f(fix(f)) - but we need to delay evaluation to avoid infinite recursion
                 let func_value = self.interpret_expression(function)?;
 
                 match func_value {
-                    Value::Function { param, body, env } => {
-                        // Create a FixedPoint value that represents the recursive function
-                        Ok(Value::FixedPoint {
-                            function: Box::new(Value::Function { param, body, env }),
-                        })
-                    }
+                    Value::Function { param, body, env } => Ok(Value::FixedPoint {
+                        function: Box::new(Value::Function { param, body, env }),
+                    }),
                     _ => Err(InterpreterError::RuntimeError {
                         message: "Fix can only be applied to functions".to_string(),
                         span: Some(span.clone()),
@@ -717,7 +688,6 @@ impl Interpreter {
                 }),
             },
 
-            // Logical operations
             BinaryOperator::LogicalAnd => {
                 Ok(Value::Bool(left_val.is_truthy() && right_val.is_truthy()))
             }
@@ -726,7 +696,6 @@ impl Interpreter {
                 Ok(Value::Bool(left_val.is_truthy() || right_val.is_truthy()))
             }
 
-            // Assignment (not typically used in expressions, but included for completeness)
             BinaryOperator::Assign => Err(InterpreterError::RuntimeError {
                 message: "Assignment operator not supported in expressions".to_string(),
                 span: Some(span.clone()),
@@ -746,22 +715,17 @@ impl Interpreter {
 
         match func_val {
             Value::Function { param, body, env } => {
-                // Create new environment with the function's captured environment
                 let mut call_env = env;
                 call_env.push_scope();
                 call_env.bind(param, arg_val);
 
-                // Create new interpreter with the call environment
                 let mut call_interpreter = Interpreter::with_environment(call_env);
                 let result = call_interpreter.interpret_expression(&body)?;
 
                 Ok(result)
             }
             Value::FixedPoint { function } => {
-                // For fixed point functions, we need to apply the function to itself first
-                // This implements the Y-combinator: fix(f) = f(fix(f))
                 if let Value::Function { param, body, env } = function.as_ref() {
-                    // Create a new environment with the recursive parameter bound to the fixed point itself
                     let mut call_env = env.clone();
                     call_env.push_scope();
                     call_env.bind(
@@ -771,8 +735,6 @@ impl Interpreter {
                         },
                     );
 
-                    // Now we need to interpret the body, which should return a function
-                    // that we then apply to the actual argument
                     let mut recursive_interpreter = Interpreter::with_environment(call_env);
                     let inner_func = recursive_interpreter.interpret_expression(&body)?;
 
@@ -806,12 +768,10 @@ impl Interpreter {
         }
     }
 
-    /// Get the current environment (for debugging/testing)
     pub fn environment(&self) -> &Environment {
         &self.environment
     }
 
-    /// Convert a Value to its string representation
     fn value_to_string(&self, value: &Value) -> String {
         match value {
             Value::Int(i) => i.to_string(),
@@ -840,7 +800,6 @@ impl Interpreter {
         }
     }
 
-    /// Format a value for print output (strings without quotes)
     fn format_for_print(&self, value: &Value) -> String {
         match value {
             Value::String(s) => s.clone(), // No quotes for print output
@@ -873,7 +832,6 @@ impl Interpreter {
         }
     }
 
-    /// Convert a Value to its type representation as a string
     fn value_to_type_string(&self, value: &Value) -> String {
         match value {
             Value::Int(_) => "Int".to_string(),
@@ -911,12 +869,9 @@ impl Interpreter {
         }
     }
 
-    /// Try to infer function type signature from the function body
     fn infer_function_type_string(&self, param: &str, body: &Expression) -> String {
-        // Try to infer the return type from the function body
         let return_type = self.infer_expression_type_string(body, param);
 
-        // Try to infer the parameter type based on how it's used
         let param_type = self.infer_parameter_type_from_usage(param, body);
 
         format!("{} -> {}", param_type, return_type)
@@ -926,7 +881,6 @@ impl Interpreter {
     fn infer_expression_type_string(&self, expr: &Expression, param: &str) -> String {
         match expr {
             Expression::Block { expression, .. } => {
-                // Handle block expressions - recurse into the inner expression
                 if let Some(expr) = expression {
                     self.infer_expression_type_string(expr, param)
                 } else {
@@ -1033,7 +987,6 @@ impl Interpreter {
                         | BinaryOperator::LessThanEqual
                         | BinaryOperator::GreaterThan
                         | BinaryOperator::GreaterThanEqual => {
-                            // For comparisons, we can often infer the parameter is Int if comparing with a number
                             match (left.as_ref(), right.as_ref()) {
                                 (Expression::Number { .. }, _) | (_, Expression::Number { .. }) => {
                                     "Int".to_string()
@@ -1098,7 +1051,6 @@ impl Interpreter {
         }
     }
 
-    /// Check if an expression uses the given parameter
     fn expression_uses_param(&self, expr: &Expression, param: &str) -> bool {
         match expr {
             Expression::Block { expression, .. } => {

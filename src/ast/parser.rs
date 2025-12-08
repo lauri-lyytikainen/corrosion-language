@@ -105,7 +105,6 @@ impl Parser {
             });
         };
 
-        // Optional type annotation
         let type_annotation = if self.peek().token == Token::Colon {
             self.advance(); // consume ':'
             Some(self.parse_type_expression()?)
@@ -159,7 +158,6 @@ impl Parser {
             });
         };
 
-        // Optional parameter type annotation
         let param_type = if self.peek().token == Token::Colon {
             self.advance(); // consume ':'
             Some(self.parse_type_expression()?)
@@ -169,7 +167,6 @@ impl Parser {
 
         self.consume(Token::RightParen, "Expected ')' after parameter")?;
 
-        // Optional return type annotation
         let return_type = if self.peek().token == Token::Arrow {
             self.advance(); // consume '->'
             Some(self.parse_type_expression()?)
@@ -213,7 +210,6 @@ impl Parser {
             });
         };
 
-        // Optional alias
         let alias = if self.peek().token == Token::As {
             self.advance(); // consume 'as'
             if let Token::Identifier(alias) = &self.advance().token {
@@ -335,7 +331,6 @@ impl Parser {
     fn parse_unary_expression(&mut self) -> ParseResult<Expression> {
         use crate::ast::nodes::UnaryOperator;
 
-        // Check if this is a unary operator
         let token = &self.peek().token;
         if matches!(token, Token::LogicalNot | Token::Minus) {
             let operator_token = self.advance();
@@ -455,7 +450,6 @@ impl Parser {
             });
         };
 
-        // Optional parameter type annotation
         let param_type = if self.peek().token == Token::Colon {
             self.advance(); // consume ':'
             Some(self.parse_type_expression()?)
@@ -466,7 +460,6 @@ impl Parser {
         self.consume(Token::RightParen, "Expected ')' after parameter")?;
         self.consume(Token::LeftBrace, "Expected '{' to start function body")?;
 
-        // Parse the function body as a block
         let body = Box::new(self.parse_block()?);
 
         self.consume(Token::RightBrace, "Expected '}' to end function body")?;
@@ -493,18 +486,13 @@ impl Parser {
         let mut final_expression = None;
 
         while !self.is_at_end() && self.peek().token != Token::RightBrace {
-            // Check if this looks like an expression statement without semicolon
-            // (which would be the final expression of the block)
             let checkpoint = self.current;
 
-            // Try to parse as a statement first
             if let Ok(stmt) = self.parse_statement() {
                 statements.push(stmt);
             } else {
-                // Restore position and try parsing as final expression
                 self.current = checkpoint;
 
-                // Only parse as final expression if we're at the end of the block
                 let expr = self.parse_expression()?;
                 final_expression = Some(Box::new(expr));
                 break;
@@ -536,10 +524,8 @@ impl Parser {
     fn parse_parenthesized_or_pair_expression(&mut self) -> ParseResult<Expression> {
         let start_span = self.previous_span();
 
-        // Parse the first expression
         let first = self.parse_expression()?;
 
-        // Check if this is a pair (has a comma) or just a parenthesized expression
         if self.peek().token == Token::Comma {
             self.advance(); // consume ','
             let second = Box::new(self.parse_expression()?);
@@ -559,7 +545,6 @@ impl Parser {
                 span,
             })
         } else {
-            // Just a parenthesized expression
             self.consume(Token::RightParen, "Expected ')'")?;
             Ok(first)
         }
@@ -569,7 +554,6 @@ impl Parser {
         let start_span = self.previous_span();
         let mut elements = Vec::new();
 
-        // Handle empty list
         if self.peek().token == Token::RightBracket {
             self.advance(); // consume ']'
             let end_span = self.previous_span();
@@ -582,14 +566,11 @@ impl Parser {
             return Ok(Expression::List { elements, span });
         }
 
-        // Parse first element
         elements.push(self.parse_expression()?);
 
-        // Parse remaining elements separated by commas
         while self.peek().token == Token::Comma {
             self.advance(); // consume ','
 
-            // Allow trailing comma before ']'
             if self.peek().token == Token::RightBracket {
                 break;
             }

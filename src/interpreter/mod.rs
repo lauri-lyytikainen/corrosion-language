@@ -12,13 +12,10 @@ pub use environment::Environment;
 pub use interpreter::Interpreter;
 pub use value::Value;
 
-/// Result type for interpreter operations
 pub type InterpreterResult<T> = Result<T, InterpreterError>;
 
-/// Interpreter error types
 #[derive(Debug, Clone, PartialEq)]
 pub enum InterpreterError {
-    /// Runtime error with a message and optional location
     RuntimeError {
         message: String,
         span: Option<crate::lexer::tokens::Span>,
