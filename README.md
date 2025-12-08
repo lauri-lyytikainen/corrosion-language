@@ -200,3 +200,10 @@ cargo test -- --nocapture
 ## Acknowledgments
 
 - Built with [Rust](https://www.rust-lang.org/) and the [nom](https://github.com/Geal/nom) parsing library
+
+### AI Disclosure
+
+Some parts of the codebase were generated with the assistance of AI tools to enhance development.
+Most of the repetitive boilerplate functions, tests and documentation were created using AI, which significantly sped up the development process.
+AI was also used as a consultant for deciding on design choices and implementations.
+AI tools were also used to understand rust language features and syntax during development, as I, the developer am not a Rust expert.
