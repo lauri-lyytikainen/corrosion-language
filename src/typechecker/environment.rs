@@ -1,7 +1,6 @@
 use crate::typechecker::Type;
 use std::collections::HashMap;
 
-/// Type environment for variable bindings
 #[derive(Debug, Clone)]
 pub struct Environment {
     bindings: HashMap<String, Type>,

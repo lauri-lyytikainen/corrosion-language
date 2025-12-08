@@ -5,9 +5,6 @@ mod repl;
 mod tests;
 pub mod typechecker;
 
-#[cfg(test)]
-mod sum_type_tests;
-
 use repl::Repl;
 use std::env;
 use std::process;

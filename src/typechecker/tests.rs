@@ -1121,4 +1121,73 @@ mod tests {
             _ => panic!("Expected variable declaration"),
         }
     }
+
+    #[test]
+    fn test_sum_type_inference() {
+        let source = "let x = if true { 42 } else { false };";
+
+        let mut tokenizer = crate::lexer::tokenizer::Tokenizer::new(source);
+        let tokens = tokenizer.tokenize(source).expect("Tokenization failed");
+
+        let mut parser = crate::ast::parser::Parser::new(tokens);
+        let ast = parser.parse().expect("Parsing failed");
+
+        let mut typechecker = TypeChecker::new();
+        let typed_ast = typechecker
+            .check_program(&ast)
+            .expect("Type checking failed");
+
+        // Verify the type is a sum type
+        assert_eq!(typed_ast.statements.len(), 1);
+        match &typed_ast.statements[0] {
+            TypedStatement::VariableDeclaration { ty, .. } => {
+                assert!(
+                    matches!(ty, Type::Sum { .. }),
+                    "Expected sum type, got {:?}",
+                    ty
+                );
+            }
+            _ => panic!("Expected variable declaration"),
+        }
+    }
+
+    #[test]
+    fn test_explicit_sum_types() {
+        let source = r#"
+            let left_val = inl(42);
+            let result = case left_val of
+              inl x => x + 10
+              | inr y => 0;
+        "#;
+
+        let mut tokenizer = crate::lexer::tokenizer::Tokenizer::new(source);
+        let tokens = tokenizer.tokenize(source).expect("Tokenization failed");
+
+        let mut parser = crate::ast::parser::Parser::new(tokens);
+        let ast = parser.parse().expect("Parsing failed");
+
+        let mut typechecker = TypeChecker::new();
+        let typed_ast = typechecker
+            .check_program(&ast)
+            .expect("Type checking failed");
+
+        // Verify both statements type check correctly
+        assert_eq!(typed_ast.statements.len(), 2);
+
+        // First statement: left injection
+        match &typed_ast.statements[0] {
+            TypedStatement::VariableDeclaration { ty, .. } => {
+                assert!(matches!(ty, Type::Sum { .. }), "Expected sum type for inl");
+            }
+            _ => panic!("Expected variable declaration"),
+        }
+
+        // Second statement: case expression
+        match &typed_ast.statements[1] {
+            TypedStatement::VariableDeclaration { ty, .. } => {
+                assert_eq!(*ty, Type::Int, "Expected Int type from case expression");
+            }
+            _ => panic!("Expected variable declaration"),
+        }
+    }
 }
